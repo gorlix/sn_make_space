@@ -1,0 +1,8 @@
+{
+  "hint": {
+    "tapToInsertSpace": "Tocca dove inserire lo spazio"
+  },
+  "error": {
+    "noNote": "Nessuna nota aperta"
+  }
+}
