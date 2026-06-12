@@ -1,77 +1,145 @@
 /**
- * Simple Plugin
+ * make_space — plugin UI.
+ *
+ * A full-screen, transparent overlay framed by a thick grey border (the visual
+ * cue "do something here"). The user taps a horizontal position; everything on
+ * the current NOTE page below that line is selected as a native lasso, and the
+ * plugin closes so the user can drag the selection by hand to open space.
+ *
+ * The move and its undo are native NOTE behavior — this plugin only builds the
+ * selection. See .claude/skills/supernote-plugin-dev/references/make-space.md.
  *
  * @format
  */
 
-import React from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
-  StatusBar,
+  Dimensions,
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  Pressable,
   StyleSheet,
   Text,
-  useColorScheme,
   View,
-  Pressable,
 } from 'react-native';
-import {PluginManager} from 'sn-plugin-lib';
+import {useTranslation} from 'react-i18next';
 
-/**
- * Plugin View
- * Displays Hello World text in the center of the screen
- */
+import {computeLassoRect} from './src/makeSpace';
+import {
+  closePluginView,
+  getCurrentFilePath,
+  getCurrentPageNum,
+  getPageSize,
+  lassoElements,
+  setLassoBoxState,
+} from './src/sdk';
+
+/** Current NOTE page context needed to build the lasso rect. */
+type PageContext = {path: string; page: number; width: number; height: number};
+
 function App(): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
+  const {t} = useTranslation();
+  const [ctx, setCtx] = useState<PageContext | null>(null);
+  const [failed, setFailed] = useState(false);
+  // Measured height of the overlay (DP). Seeded with the window height so the
+  // first tap still maps sensibly if it lands before onLayout fires.
+  const viewHeight = useRef(Dimensions.get('window').height);
+  // Guards against a second tap while the lasso/close flow is in flight.
+  const busy = useRef(false);
 
-  const handleClose = () => {
-    PluginManager.closePluginView();
+  // Load the current note + page size once on mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const fp = await getCurrentFilePath();
+        const pn = await getCurrentPageNum();
+        if (!fp?.success || !fp.result || !pn?.success || pn.result == null) {
+          setFailed(true);
+          return;
+        }
+        const ps = await getPageSize(fp.result, pn.result);
+        if (!ps?.success || !ps.result) {
+          setFailed(true);
+          return;
+        }
+        setCtx({
+          path: fp.result,
+          page: pn.result,
+          width: ps.result.width,
+          height: ps.result.height,
+        });
+      } catch {
+        setFailed(true);
+      }
+    })();
+  }, []);
+
+  const onLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0) {
+      viewHeight.current = h;
+    }
+  };
+
+  /**
+   * Build a lasso of everything below the tapped line, then hand control back
+   * to NOTE so the user can drag the selection.
+   */
+  const onTap = async (e: GestureResponderEvent) => {
+    if (!ctx || busy.current) {
+      return;
+    }
+    busy.current = true;
+    try {
+      const rect = computeLassoRect(
+        e.nativeEvent.locationY,
+        viewHeight.current,
+        ctx.width,
+        ctx.height,
+      );
+      const res = await lassoElements(rect);
+      if (res?.success && res.result) {
+        // 0 = show the selection box so the user sees what will move.
+        await setLassoBoxState(0);
+      }
+    } finally {
+      // Always return control to the note, even if the lasso found nothing.
+      await closePluginView();
+    }
   };
 
   return (
-    <View style={styles.container}>
-      <Pressable style={styles.closeButton} onPress={handleClose}>
-        <Text
-          style={[
-            styles.closeText,
-            {color: isDarkMode ? '#ffffff' : '#000000'},
-          ]}>
-          ✕
-        </Text>
+    <View style={styles.frame} onLayout={onLayout}>
+      <Pressable style={StyleSheet.absoluteFill} onPress={onTap}>
+        <View style={styles.hintBar} pointerEvents="none">
+          <Text style={styles.hintText}>
+            {failed ? t('error.noNote') : t('hint.tapToInsertSpace')}
+          </Text>
+        </View>
       </Pressable>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={isDarkMode ? '#000000' : '#ffffff'}
-      />
-      <Text
-        style={[styles.helloText, {color: isDarkMode ? '#ffffff' : '#000000'}]}>
-        Hello World
-      </Text>
     </View>
   );
 }
 
+const BORDER = '#9e9e9e';
+
 const styles = StyleSheet.create({
-  container: {
+  frame: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'transparent',
+    borderWidth: 8,
+    borderColor: BORDER,
   },
-  closeButton: {
+  hintBar: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+    top: 24,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
-  closeText: {
+  hintText: {
     fontSize: 18,
-    fontWeight: '600',
-  },
-  helloText: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
+    color: BORDER,
   },
 });
 
