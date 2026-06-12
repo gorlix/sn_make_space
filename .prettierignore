@@ -1,0 +1,22 @@
+# Dependencies & build output
+node_modules/
+build/
+coverage/
+*.snplg
+
+# Native platform projects (managed by their own tooling)
+android/
+ios/
+
+# Husky internals (regenerated)
+.husky/_/
+
+# Lockfiles
+package-lock.json
+yarn.lock
+
+# Docs / config not owned by Prettier formatting
+.claude/
+.github/
+.mcp.json
+.vscode/

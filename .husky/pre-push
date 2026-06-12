@@ -1,0 +1,2 @@
+# Run the full test suite before pushing.
+npm test
