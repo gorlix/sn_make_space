@@ -1,97 +1,119 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# ✍️ Make Space
 
-# Getting Started
+> Insert blank writing space anywhere on a Supernote page — just tap a line and push everything below it down.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+Ever filled a page by hand and then needed **one more line** in the middle? On paper you're stuck. On a Supernote, **Make Space** gives you room: tap where you need space, and everything underneath slides down so you can keep writing.
 
-## Step 1: Start Metro
+Inspired by OneNote's _“Insert extra writing space”_, built as a native Supernote plugin.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+---
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## 🎥 Demo
 
-```sh
-# Using npm
-npm start
+<!-- Drop your demo video here (drag-and-drop an .mp4 into this section on GitHub, or link it). -->
 
-# OR using Yarn
-yarn start
+_Demo video coming soon._
+
+---
+
+## ✨ What it does
+
+You're writing notes. Two lines are too close together and you need to squeeze something in between. Instead of erasing and rewriting:
+
+1. Open **Make Space** from the toolbar.
+2. A light **grey frame** appears around the screen — that's your cue.
+3. **Tap** the spot where you want room.
+4. Everything below that point gets selected — now just **drag it down** to open up as much space as you like.
+
+That's it. The move is the Supernote's own selection drag, so **undo works normally**.
+
+```
+┌─────────────────────────────┐
+│  line written above         │
+│                             │
+│ ─ ─ ─ ─ tap here ─ ─ ─ ─ ─  │  ← tap
+│   ↓ drag down to make room ↓ │
+│  line written below         │
+└─────────────────────────────┘
 ```
 
-## Step 2: Build and run your app
+---
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## 📲 Install on your Supernote
 
-### Android
+1. Build the plugin package (see [Build](#-build-from-source)) — or grab `sn_make_space.snplg` from a [Release](../../releases).
+2. Copy it to your device:
+   ```bash
+   adb push sn_make_space.snplg /storage/emulated/0/MyStyle/
+   ```
+   (or just copy the file into the `MyStyle` folder over USB)
+3. On the Supernote: **Settings → Apps → Plugins → Install** and pick `sn_make_space`.
+4. Open a note, tap **Make Space** in the toolbar, and go.
 
-```sh
-# Using npm
-npm run android
+> Works in the **NOTE** app.
 
-# OR using Yarn
-yarn android
+---
+
+## 🛠 Build from source
+
+Requirements: Node 18+, and `zip` + `jq` (preinstalled on most systems).
+
+```bash
+npm ci             # install dependencies
+bash ./buildPlugin.sh   # → build/outputs/sn_make_space.snplg
 ```
 
-### iOS
+The script bundles the JavaScript and packages it into a `.snplg`. No Android Studio needed — this plugin is pure JS.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+---
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+## 🧑‍💻 Development
 
-```sh
-bundle install
+Built with **React Native 0.79.2** + the **`sn-plugin-lib`** Supernote SDK.
+
+```bash
+npm run typecheck   # TypeScript
+npm run lint        # ESLint
+npm run format      # Prettier check
+npm test            # Jest
 ```
 
-Then, and every time you update your native dependencies, run:
+- **Pre-commit** runs lint + format + typecheck; **pre-push** runs the tests (via Husky).
+- **CI** runs the full gate on every PR; **releases** are published automatically when you push a `v*` tag.
+- Bilingual UI out of the box: **English 🇬🇧 + Italian 🇮🇹**.
 
-```sh
-bundle exec pod install
-```
+### Project layout
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+| Path               | What's inside                                        |
+| ------------------ | ---------------------------------------------------- |
+| `index.js`         | Plugin entry — registers the toolbar button          |
+| `App.tsx`          | The overlay: grey frame, tap handling, lasso + close |
+| `src/makeSpace.ts` | Pure tap-to-rectangle math (unit-tested)             |
+| `src/sdk.ts`       | Typed wrapper over `sn-plugin-lib`                   |
+| `src/i18n/`        | Localization (en + it)                               |
+| `__tests__/`       | Jest tests                                           |
 
-```sh
-# Using npm
-npm run ios
+---
 
-# OR using Yarn
-yarn ios
-```
+## 🧭 How it works under the hood
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+The Supernote SDK has no “move selection” command, so Make Space leans on what the device already does well: it turns your tap into a **native lasso** of everything below the line, then hands control back so you drag it yourself. Simple, reliable, and undoable.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+The full **one-gesture auto-move** (drag once, everything shifts automatically) is the next milestone — see the roadmap.
 
-## Step 3: Modify your app
+---
 
-Now that you have successfully run the app, let's make changes!
+## 🗺 Roadmap
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Tracked as GitHub issues:
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+- **[v1 refinements](../../milestone/1)** — layer toggle, landscape support, on-screen cut-line preview, and more.
+- **[v2 — one-gesture auto-move](../../milestone/2)** — drag once and the page reflows automatically, with new-page overflow.
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+Browse the [open issues](../../issues) to see what's planned.
 
-## Congratulations! :tada:
+---
 
-You've successfully run and modified your React Native App. :partying_face:
+## 🙏 Built with
 
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+[React Native](https://reactnative.dev) · [`sn-plugin-lib`](https://docs.supernote.com) · [Supernote docs](https://docs.supernote.com)
