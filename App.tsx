@@ -39,7 +39,12 @@ type PageContext = {path: string; page: number; width: number; height: number};
 
 const TAG = '[make_space]';
 // Verbose logging so the whole flow is visible in `adb logcat -s ReactNativeJS:V`.
-const log = (...args: unknown[]) => console.log(TAG, ...args);
+// Gated behind __DEV__ so release bundles (built with `--dev false`) stay silent.
+const log = (...args: unknown[]) => {
+  if (__DEV__) {
+    console.log(TAG, ...args);
+  }
+};
 
 /**
  * Read the current note path + page + pixel size. Returns null (and logs why)
