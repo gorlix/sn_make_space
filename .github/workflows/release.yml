@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish .snplg
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history + tags for the annotation message
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Quality gate
+        run: |
+          npm run typecheck
+          npm run lint
+          npm run format
+          npm run test:ci
+
+      - name: Stamp version into PluginConfig.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" --arg c "${GITHUB_RUN_NUMBER}" \
+            '.versionName = $v | .versionCode = $c' \
+            PluginConfig.json > PluginConfig.json.tmp
+          mv PluginConfig.json.tmp PluginConfig.json
+          echo "Building version $VERSION (code ${GITHUB_RUN_NUMBER})"
+
+      - name: Build plugin package
+        run: bash ./buildPlugin.sh
+
+      - name: Extract annotated tag message as release notes
+        id: notes
+        run: |
+          {
+            echo 'body<<RELEASE_EOF'
+            git tag -l --format='%(contents)' "${GITHUB_REF_NAME}"
+            echo 'RELEASE_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body: ${{ steps.notes.outputs.body }}
+          files: build/outputs/*.snplg

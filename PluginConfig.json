@@ -1,0 +1,10 @@
+{
+  "name": "sn_make_space",
+  "desc": "Insert extra writing space on a NOTE page (tap a line, lasso everything below, drag to make room).",
+  "iconPath": "assets/icon.png",
+  "versionName": "0.0.1",
+  "versionCode": "1",
+  "pluginID": "lome8csqs3xu38pv",
+  "pluginKey": "sn_make_space",
+  "jsMainPath": "index"
+}
