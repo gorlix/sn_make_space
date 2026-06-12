@@ -1,8 +1,8 @@
 # ✍️ Make Space
 
-> Insert blank writing space anywhere on a Supernote page — just tap a line and push everything below it down.
+> Insert blank writing space anywhere on a Supernote page — just tap a line and slide everything below it up or down.
 
-Ever filled a page by hand and then needed **one more line** in the middle? On paper you're stuck. On a Supernote, **Make Space** gives you room: tap where you need space, and everything underneath slides down so you can keep writing.
+Ever filled a page by hand and then needed **one more line** in the middle? On paper you're stuck. On a Supernote, **Make Space** gives you room: tap where you need space, and everything underneath slides down (or back up) so you can keep writing.
 
 Inspired by OneNote's _“Insert extra writing space”_, built as a native Supernote plugin.
 
@@ -23,7 +23,7 @@ You're writing notes. Two lines are too close together and you need to squeeze s
 1. Open **Make Space** from the toolbar.
 2. A light **grey frame** appears around the screen — that's your cue.
 3. **Tap** the spot where you want room.
-4. Everything below that point gets selected — now just **drag it down** to open up as much space as you like.
+4. Everything below that point gets selected — now **drag it up or down**: down to open space, up to close a gap.
 
 That's it. The move is the Supernote's own selection drag, so **undo works normally**.
 
@@ -32,7 +32,8 @@ That's it. The move is the Supernote's own selection drag, so **undo works norma
 │  line written above         │
 │                             │
 │ ─ ─ ─ ─ tap here ─ ─ ─ ─ ─  │  ← tap
-│   ↓ drag down to make room ↓ │
+│   ↕ drag up or down          │
+│     (add / remove space)     │
 │  line written below         │
 └─────────────────────────────┘
 ```
@@ -41,14 +42,20 @@ That's it. The move is the Supernote's own selection drag, so **undo works norma
 
 ## 📲 Install on your Supernote
 
-1. Build the plugin package (see [Build](#-build-from-source)) — or grab `sn_make_space.snplg` from a [Release](../../releases).
-2. Copy it to your device:
+First, get the plugin file. **It is not in this repository** — the `build/` folder is git-ignored, so the `.snplg` is never committed. You have two options:
+
+- **Download** `sn_make_space.snplg` from the latest [Release](../../releases), **or**
+- **Build it yourself** (see [Build from source](#-build-from-source)).
+
+Then install it:
+
+1. Copy the file to your device:
    ```bash
    adb push sn_make_space.snplg /storage/emulated/0/MyStyle/
    ```
-   (or just copy the file into the `MyStyle` folder over USB)
-3. On the Supernote: **Settings → Apps → Plugins → Install** and pick `sn_make_space`.
-4. Open a note, tap **Make Space** in the toolbar, and go.
+   (or just copy it into the `MyStyle` folder over USB)
+2. On the Supernote: **Settings → Apps → Plugins → Install** and pick `sn_make_space`.
+3. Open a note, tap **Make Space** in the toolbar, and go.
 
 > Works in the **NOTE** app.
 
