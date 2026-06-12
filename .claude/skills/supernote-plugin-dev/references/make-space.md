@@ -101,9 +101,29 @@ await PluginFileAPI.generateNotePng({
 
 The tap-Y math and the lasso call are identical in both UI variants.
 
+**Transparency verified on-device (A5X2 / SN100): the overlay IS transparent** — the note shows
+through the grey frame, no `generateNotePng` fallback needed. Keep the fallback documented for other
+firmware, but the primary path works.
+
+### ⚠️ PluginHost REUSES the App instance across open/close (verified on-device)
+
+When the plugin view is closed (`closePluginView`) and reopened, PluginHost does **not** remount the
+React tree — there is **one** `App mounted`, then every later open only re-renders. Confirmed by
+logcat: tap → close → reopen → tap shows no `App unmounted`/`App mounted` between them.
+
+Consequences:
+- `useRef` / module-level state **persists** across opens. A guard ref (e.g. `busy` to debounce the
+  tap) that you set on tap **must be reset in `finally`**, or the second open is frozen with the
+  guard stuck `true` (this was the real "second open stuck on the grey frame" bug).
+- `useEffect(() => …, [])` runs **once**, not per open. Do not rely on it to refresh per-open state.
+  Fetch the page context (`getCurrentFilePath/PageNum/PageSize`) **fresh inside the tap handler**, so
+  it is always current even if the user switched note/page between opens.
+
 ## 5. i18n (en + it)
 
-`i18next` + `react-i18next` (+ `react-native-localize`). Pattern from `i18n.md`. Init in
+`i18next` + `react-i18next` only (**no `react-native-localize`** — pure JS, avoids the PluginHost
+`reactPackages` native-linking issue). Initial language from RN core
+`NativeModules.I18nManager.localeIdentifier`; runtime changes via `registerLangListener`. Init in
 `src/i18n/index.ts`, imported once from `index.js`. Locales `src/i18n/locales/{en_US,it_IT}.json`.
 All UI strings via `t('key')`. Button name = serialized JSON so it follows device language:
 

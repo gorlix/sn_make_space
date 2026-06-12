@@ -37,45 +37,68 @@ import {
 /** Current NOTE page context needed to build the lasso rect. */
 type PageContext = {path: string; page: number; width: number; height: number};
 
+const TAG = '[make_space]';
+// Verbose logging so the whole flow is visible in `adb logcat -s ReactNativeJS:V`.
+const log = (...args: unknown[]) => console.log(TAG, ...args);
+
+/**
+ * Read the current note path + page + pixel size. Returns null (and logs why)
+ * if anything is missing — e.g. no note open. Called both on mount (for the
+ * hint) and fresh on every tap (so it never acts on a stale page).
+ */
+async function loadContext(where: string): Promise<PageContext | null> {
+  try {
+    const fp = await getCurrentFilePath();
+    log(where, 'getCurrentFilePath ->', fp);
+    const pn = await getCurrentPageNum();
+    log(where, 'getCurrentPageNum ->', pn);
+    if (!fp?.success || !fp.result || !pn?.success || pn.result == null) {
+      log(where, 'context unavailable (no note?)');
+      return null;
+    }
+    const ps = await getPageSize(fp.result, pn.result);
+    log(where, 'getPageSize ->', ps);
+    if (!ps?.success || !ps.result) {
+      log(where, 'page size unavailable');
+      return null;
+    }
+    return {
+      path: fp.result,
+      page: pn.result,
+      width: ps.result.width,
+      height: ps.result.height,
+    };
+  } catch (err) {
+    log(where, 'loadContext threw:', String(err));
+    return null;
+  }
+}
+
 function App(): React.JSX.Element {
   const {t} = useTranslation();
-  const [ctx, setCtx] = useState<PageContext | null>(null);
   const [failed, setFailed] = useState(false);
   // Measured height of the overlay (DP). Seeded with the window height so the
   // first tap still maps sensibly if it lands before onLayout fires.
   const viewHeight = useRef(Dimensions.get('window').height);
-  // Guards against a second tap while the lasso/close flow is in flight.
+  // Guards against a second tap while the lasso/close flow is in flight. MUST be
+  // reset in the finally below — PluginHost can keep this App instance alive
+  // across open/close cycles, so a stuck `true` would freeze every later open.
   const busy = useRef(false);
 
-  // Load the current note + page size once on mount.
   useEffect(() => {
+    log('App mounted; window=', Dimensions.get('window'));
+    // Make sure a reused instance never reopens locked.
+    busy.current = false;
     (async () => {
-      try {
-        const fp = await getCurrentFilePath();
-        const pn = await getCurrentPageNum();
-        if (!fp?.success || !fp.result || !pn?.success || pn.result == null) {
-          setFailed(true);
-          return;
-        }
-        const ps = await getPageSize(fp.result, pn.result);
-        if (!ps?.success || !ps.result) {
-          setFailed(true);
-          return;
-        }
-        setCtx({
-          path: fp.result,
-          page: pn.result,
-          width: ps.result.width,
-          height: ps.result.height,
-        });
-      } catch {
-        setFailed(true);
-      }
+      const ctx = await loadContext('mount');
+      setFailed(ctx == null);
     })();
+    return () => log('App unmounted');
   }, []);
 
   const onLayout = (e: LayoutChangeEvent) => {
     const h = e.nativeEvent.layout.height;
+    log('onLayout height=', h);
     if (h > 0) {
       viewHeight.current = h;
     }
@@ -86,27 +109,56 @@ function App(): React.JSX.Element {
    * to NOTE so the user can drag the selection.
    */
   const onTap = async (e: GestureResponderEvent) => {
-    if (!ctx || busy.current) {
+    const tapY = e.nativeEvent.locationY;
+    log(
+      'onTap tapY=',
+      tapY,
+      'viewH=',
+      viewHeight.current,
+      'busy=',
+      busy.current,
+    );
+    if (busy.current) {
+      log('onTap ignored: busy');
       return;
     }
     busy.current = true;
     try {
+      const ctx = await loadContext('tap');
+      if (!ctx) {
+        setFailed(true);
+        return;
+      }
       const rect = computeLassoRect(
-        e.nativeEvent.locationY,
+        tapY,
         viewHeight.current,
         ctx.width,
         ctx.height,
       );
+      log('lasso rect=', rect);
       const res = await lassoElements(rect);
+      log('lassoElements ->', res);
       if (res?.success && res.result) {
-        // 0 = show the selection box so the user sees what will move.
-        await setLassoBoxState(0);
+        const box = await setLassoBoxState(0);
+        log('setLassoBoxState ->', box);
       }
+    } catch (err) {
+      log('onTap threw:', String(err));
     } finally {
-      // Always return control to the note, even if the lasso found nothing.
-      await closePluginView();
+      log('closePluginView…');
+      try {
+        const closed = await closePluginView();
+        log('closePluginView ->', closed);
+      } catch (err) {
+        log('closePluginView threw:', String(err));
+      }
+      // Release the guard so the next open is usable even if App is reused.
+      busy.current = false;
+      log('onTap done; busy reset');
     }
   };
+
+  log('App render; failed=', failed);
 
   return (
     <View style={styles.frame} onLayout={onLayout}>
