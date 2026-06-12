@@ -12,10 +12,14 @@ import {name as appName} from './app.json';
 // Side-effect import: initializes i18next before any UI renders.
 import './src/i18n';
 
+const TAG = '[make_space]';
+
+console.log(TAG, 'index.js loaded; registering component', appName);
 AppRegistry.registerComponent(appName, () => App);
 
 // Must run before any other SDK call, otherwise they silently fail.
 PluginManager.init();
+console.log(TAG, 'PluginManager.init() done');
 
 // Single toolbar/sidebar button (NOTE only). Tapping it opens the plugin UI
 // (App.tsx) full-screen. `name` is a serialized JSON map so the label follows
@@ -26,3 +30,4 @@ PluginManager.registerButton(1, ['NOTE'], {
   icon: Image.resolveAssetSource(require('./assets/icon.png')).uri,
   showType: 1,
 });
+console.log(TAG, 'button 100 registered');
