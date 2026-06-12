@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "supernote-docs": {
+      "type": "http",
+      "url": "https://docs.supernote.com/mcp"
+    }
+  }
+}

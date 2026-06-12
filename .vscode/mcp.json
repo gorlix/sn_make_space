@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"Supernote": {
+			"url": "https://docs.supernote.com/mcp",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}
