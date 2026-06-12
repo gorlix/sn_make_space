@@ -1,0 +1,8 @@
+{
+  "hint": {
+    "tapToInsertSpace": "Tap where you want to insert space"
+  },
+  "error": {
+    "noNote": "No note open"
+  }
+}
