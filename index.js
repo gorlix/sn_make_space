@@ -1,35 +1,28 @@
 /**
+ * make_space — plugin entry point.
+ *
  * @format
  */
 
 import {AppRegistry, Image} from 'react-native';
+import {PluginManager} from 'sn-plugin-lib';
+
 import App from './App';
 import {name as appName} from './app.json';
-
-import {PluginManager} from 'sn-plugin-lib';
+// Side-effect import: initializes i18next before any UI renders.
+import './src/i18n';
 
 AppRegistry.registerComponent(appName, () => App);
 
+// Must run before any other SDK call, otherwise they silently fail.
 PluginManager.init();
 
-PluginManager.registerButton(1, ['NOTE', 'DOC'], {
+// Single toolbar/sidebar button (NOTE only). Tapping it opens the plugin UI
+// (App.tsx) full-screen. `name` is a serialized JSON map so the label follows
+// the device language.
+PluginManager.registerButton(1, ['NOTE'], {
   id: 100,
-  name: 'Side Button',
-  icon: Image.resolveAssetSource(require('./assets/icon.png')).uri,
-  showType: 1,
-});
-
-PluginManager.registerButton(2, ['NOTE', 'DOC'], {
-  id: 200,
-  name: 'Lasso Button',
-  icon: Image.resolveAssetSource(require('./assets/icon.png')).uri,
-  editDataTypes: [0, 1, 2, 3, 4],
-  showType: 1,
-});
-
-PluginManager.registerButton(3, ['NOTE', 'DOC'], {
-  id: 300,
-  name: 'Selection Button',
+  name: JSON.stringify({en: 'Make Space', it: 'Fai Spazio'}),
   icon: Image.resolveAssetSource(require('./assets/icon.png')).uri,
   showType: 1,
 });
