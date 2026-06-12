@@ -73,3 +73,15 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Supernote plugin build artifacts
+*.snplg
+build/outputs/
+build/generated/
+
+# Env / secrets
+.env
+.env.*
+
+# Logs
+*.log
