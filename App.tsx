@@ -25,6 +25,7 @@ import {
 import {useTranslation} from 'react-i18next';
 
 import {computeLassoRect} from './src/makeSpace';
+import {dismissIntro, isIntroDismissed} from './src/prefs';
 import {
   closePluginView,
   getCurrentFilePath,
@@ -82,6 +83,9 @@ async function loadContext(where: string): Promise<PageContext | null> {
 function App(): React.JSX.Element {
   const {t} = useTranslation();
   const [failed, setFailed] = useState(false);
+  // First-run intro popup. Initialised from the in-session flag so it shows once
+  // per session (and not at all after "don't show again"). See src/prefs.ts.
+  const [showIntro, setShowIntro] = useState(() => !isIntroDismissed());
   // Measured height of the overlay (DP). Seeded with the window height so the
   // first tap still maps sensibly if it lands before onLayout fires.
   const viewHeight = useRef(Dimensions.get('window').height);
@@ -114,6 +118,10 @@ function App(): React.JSX.Element {
    * to NOTE so the user can drag the selection.
    */
   const onTap = async (e: GestureResponderEvent) => {
+    // Ignore taps while the intro is up — the popup handles its own buttons.
+    if (showIntro) {
+      return;
+    }
     const tapY = e.nativeEvent.locationY;
     log(
       'onTap tapY=',
@@ -163,29 +171,60 @@ function App(): React.JSX.Element {
     }
   };
 
-  log('App render; failed=', failed);
+  log('App render; failed=', failed, 'showIntro=', showIntro);
 
   return (
     <View style={styles.frame} onLayout={onLayout}>
       <Pressable style={StyleSheet.absoluteFill} onPress={onTap}>
         <View style={styles.hintBar} pointerEvents="none">
-          <Text style={styles.hintText}>
-            {failed ? t('error.noNote') : t('hint.tapToInsertSpace')}
-          </Text>
+          <View style={styles.hintPill}>
+            <Text style={styles.hintText}>
+              {failed ? t('error.noNote') : t('hint.tapToInsertSpace')}
+            </Text>
+          </View>
         </View>
       </Pressable>
+
+      {showIntro && (
+        // Backdrop is a Pressable so taps on it are absorbed (never reach the
+        // lasso layer); it only dims the page so the card reads clearly.
+        <Pressable style={styles.introBackdrop} onPress={() => {}}>
+          <View style={styles.introCard}>
+            <Text style={styles.introTitle}>{t('intro.title')}</Text>
+            <Text style={styles.introBody}>{t('intro.body')}</Text>
+            <View style={styles.introButtons}>
+              <Pressable
+                style={styles.introBtnGhost}
+                onPress={() => {
+                  dismissIntro();
+                  setShowIntro(false);
+                }}>
+                <Text style={styles.introBtnGhostText}>
+                  {t('intro.dontShowAgain')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={styles.introBtn}
+                onPress={() => setShowIntro(false)}>
+                <Text style={styles.introBtnText}>{t('intro.gotIt')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 }
 
-const BORDER = '#9e9e9e';
+const FRAME = '#9e9e9e';
+const INK = '#000000';
 
 const styles = StyleSheet.create({
   frame: {
     flex: 1,
     backgroundColor: 'transparent',
     borderWidth: 8,
-    borderColor: BORDER,
+    borderColor: FRAME,
   },
   hintBar: {
     position: 'absolute',
@@ -194,9 +233,74 @@ const styles = StyleSheet.create({
     right: 0,
     alignItems: 'center',
   },
+  // High-contrast pill so the hint is clearly visible over the note on e-ink.
+  hintPill: {
+    backgroundColor: INK,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
   hintText: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  introBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+  },
+  introCard: {
+    width: '100%',
+    maxWidth: 560,
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: INK,
+    borderRadius: 16,
+    padding: 28,
+  },
+  introTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: INK,
+    marginBottom: 14,
+  },
+  introBody: {
+    fontSize: 19,
+    lineHeight: 28,
+    color: INK,
+  },
+  introButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 28,
+  },
+  introBtn: {
+    backgroundColor: INK,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginLeft: 12,
+  },
+  introBtnText: {
     fontSize: 18,
-    color: BORDER,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  introBtnGhost: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 2,
+    borderColor: INK,
+  },
+  introBtnGhostText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: INK,
   },
 });
 
