@@ -1,10 +1,10 @@
 /**
  * make_space — plugin UI.
  *
- * A full-screen, transparent overlay framed by a thick grey border (the visual
- * cue "do something here"). The user taps a horizontal position; everything on
- * the current NOTE page below that line is selected as a native lasso, and the
- * plugin closes so the user can drag the selection by hand to open space.
+ * Full-screen, transparent overlay framed by a thick grey border. Press and
+ * drag with the pen: a thin guide line follows to show exactly where the cut
+ * will be; lift to commit — everything on the current NOTE page below that line
+ * is lassoed and the plugin closes so you can drag the selection to make space.
  *
  * The move and its undo are native NOTE behavior — this plugin only builds the
  * selection. See .claude/skills/supernote-plugin-dev/references/make-space.md.
@@ -17,6 +17,7 @@ import {
   Dimensions,
   GestureResponderEvent,
   LayoutChangeEvent,
+  PanResponder,
   Pressable,
   StyleSheet,
   Text,
@@ -49,8 +50,8 @@ const log = (...args: unknown[]) => {
 
 /**
  * Read the current note path + page + pixel size. Returns null (and logs why)
- * if anything is missing — e.g. no note open. Called both on mount (for the
- * hint) and fresh on every tap (so it never acts on a stale page).
+ * if anything is missing — e.g. no note open. Called on mount (for the hint)
+ * and fresh on every commit (so it never acts on a stale page).
  */
 async function loadContext(where: string): Promise<PageContext | null> {
   try {
@@ -86,11 +87,21 @@ function App(): React.JSX.Element {
   // First-run intro popup. Initialised from the in-session flag so it shows once
   // per session (and not at all after "don't show again"). See src/prefs.ts.
   const [showIntro, setShowIntro] = useState(() => !isIntroDismissed());
+  // Y of the guide line while dragging (DP, frame-relative); null when idle.
+  // Positioned with `top` so it lands exactly where the pen is (and where the
+  // cut will be). Updated on every move — re-renders on slow e-ink lag a little
+  // but stay aligned, which matters more than buttery motion here.
+  const [lineY, setLineY] = useState<number | null>(null);
+  // True from release until the plugin closes. Keeps the hint hidden during the
+  // lasso/close window so it doesn't flash back on (a brief flash just ghosts on
+  // e-ink). Set synchronously on release so there's no frame where it shows.
+  const [committing, setCommitting] = useState(false);
+
   // Measured height of the overlay (DP). Seeded with the window height so the
-  // first tap still maps sensibly if it lands before onLayout fires.
+  // first commit still maps sensibly if it lands before onLayout fires.
   const viewHeight = useRef(Dimensions.get('window').height);
-  // Guards against a second tap while the lasso/close flow is in flight. MUST be
-  // reset in the finally below — PluginHost can keep this App instance alive
+  // Guards against a second commit while the lasso/close flow is in flight. MUST
+  // be reset in the finally below — PluginHost can keep this App instance alive
   // across open/close cycles, so a stuck `true` would freeze every later open.
   const busy = useRef(false);
 
@@ -114,36 +125,24 @@ function App(): React.JSX.Element {
   };
 
   /**
-   * Build a lasso of everything below the tapped line, then hand control back
+   * Commit the cut at line Y: lasso everything below it, then hand control back
    * to NOTE so the user can drag the selection.
    */
-  const onTap = async (e: GestureResponderEvent) => {
-    // Ignore taps while the intro is up — the popup handles its own buttons.
-    if (showIntro) {
-      return;
-    }
-    const tapY = e.nativeEvent.locationY;
-    log(
-      'onTap tapY=',
-      tapY,
-      'viewH=',
-      viewHeight.current,
-      'busy=',
-      busy.current,
-    );
+  const runCut = async (y: number) => {
     if (busy.current) {
-      log('onTap ignored: busy');
+      log('runCut ignored: busy');
       return;
     }
     busy.current = true;
+    setCommitting(true);
     try {
-      const ctx = await loadContext('tap');
+      const ctx = await loadContext('cut');
       if (!ctx) {
         setFailed(true);
         return;
       }
       const rect = computeLassoRect(
-        tapY,
+        y,
         viewHeight.current,
         ctx.width,
         ctx.height,
@@ -152,11 +151,12 @@ function App(): React.JSX.Element {
       const res = await lassoElements(rect);
       log('lassoElements ->', res);
       if (res?.success && res.result) {
+        // 0 = show the selection box so the user sees what will move.
         const box = await setLassoBoxState(0);
         log('setLassoBoxState ->', box);
       }
     } catch (err) {
-      log('onTap threw:', String(err));
+      log('runCut threw:', String(err));
     } finally {
       log('closePluginView…');
       try {
@@ -167,15 +167,54 @@ function App(): React.JSX.Element {
       }
       // Release the guard so the next open is usable even if App is reused.
       busy.current = false;
-      log('onTap done; busy reset');
+      setCommitting(false);
+      log('runCut done; busy reset');
     }
   };
 
-  log('App render; failed=', failed, 'showIntro=', showIntro);
+  // Always-current gesture handlers, reached through a stable PanResponder
+  // (created once) so the responder never closes over stale state.
+  const gesture = {
+    shouldSet: () => !showIntro && !busy.current,
+    grant: (e: GestureResponderEvent) => {
+      const y = e.nativeEvent.locationY;
+      setLineY(y);
+      log('drag grant y=', y);
+    },
+    move: (e: GestureResponderEvent) => {
+      setLineY(e.nativeEvent.locationY);
+    },
+    release: (e: GestureResponderEvent) => {
+      const y = e.nativeEvent.locationY;
+      log('drag release y=', y);
+      setLineY(null);
+      runCut(y);
+    },
+  };
+  const gestureRef = useRef(gesture);
+  gestureRef.current = gesture;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => gestureRef.current.shouldSet(),
+      onMoveShouldSetPanResponder: () => gestureRef.current.shouldSet(),
+      onPanResponderGrant: e => gestureRef.current.grant(e),
+      onPanResponderMove: e => gestureRef.current.move(e),
+      onPanResponderRelease: e => gestureRef.current.release(e),
+      onPanResponderTerminate: e => gestureRef.current.release(e),
+    }),
+  ).current;
+
+  log('App render; failed=', failed, 'showIntro=', showIntro, 'lineY=', lineY);
+
+  const dragging = lineY != null;
 
   return (
-    <View style={styles.frame} onLayout={onLayout}>
-      <Pressable style={StyleSheet.absoluteFill} onPress={onTap}>
+    <View
+      style={styles.frame}
+      onLayout={onLayout}
+      {...panResponder.panHandlers}>
+      {!dragging && !committing && (
         <View style={styles.hintBar} pointerEvents="none">
           <View style={styles.hintPill}>
             <Text style={styles.hintText}>
@@ -183,11 +222,15 @@ function App(): React.JSX.Element {
             </Text>
           </View>
         </View>
-      </Pressable>
+      )}
+
+      {lineY != null && (
+        <View style={[styles.cutLine, {top: lineY}]} pointerEvents="none" />
+      )}
 
       {showIntro && (
         // Backdrop is a Pressable so taps on it are absorbed (never reach the
-        // lasso layer); it only dims the page so the card reads clearly.
+        // drag layer); it only dims the page so the card reads clearly.
         <Pressable style={styles.introBackdrop} onPress={() => {}}>
           <View style={styles.introCard}>
             <Text style={styles.introTitle}>{t('intro.title')}</Text>
@@ -218,6 +261,8 @@ function App(): React.JSX.Element {
 
 const FRAME = '#9e9e9e';
 const INK = '#000000';
+// Guide line matches the frame border exactly (light grey).
+const LINE = FRAME;
 
 const styles = StyleSheet.create({
   frame: {
@@ -244,6 +289,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  // The guide line that follows the pen while dragging; same grey as the frame.
+  cutLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: LINE,
   },
   introBackdrop: {
     ...StyleSheet.absoluteFillObject,
