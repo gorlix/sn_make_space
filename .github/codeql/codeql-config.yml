@@ -1,0 +1,14 @@
+name: "make_space CodeQL config"
+
+# Only analyze our own code. The Android debug build (needed to extract Kotlin)
+# also compiles the SDK's bundled Java under node_modules — exclude it and any
+# build output / unused iOS scaffold so alerts come from our sources only.
+paths-ignore:
+  - node_modules
+  - "**/build/**"
+  - android/app/build
+  - ios
+
+# Security-focused queries (no code-quality/style noise).
+queries:
+  - uses: security-extended
