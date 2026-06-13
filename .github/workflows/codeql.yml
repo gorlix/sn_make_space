@@ -1,0 +1,79 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC
+
+# Don't pile up CodeQL runs on rapid pushes.
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Our plugin code (interpreted — no build needed).
+          - language: javascript-typescript
+            build-mode: none
+          # Android native. Kotlin must be compiled for CodeQL to see it
+          # (build-mode none reports "no source seen", autobuild can't drive
+          # the RN Gradle project), so we do a real debug build below.
+          - language: java-kotlin
+            build-mode: manual
+          # The GitHub Actions workflows themselves.
+          - language: actions
+            build-mode: none
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- Android toolchain (only for the manual java-kotlin build) ---
+      - name: Set up Node
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Set up JDK
+        if: matrix.build-mode == 'manual'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Set up Android SDK
+        if: matrix.build-mode == 'manual'
+        uses: android-actions/setup-android@v3
+      - name: Install JS deps (needed by the RN Gradle plugin/autolinking)
+        if: matrix.build-mode == 'manual'
+        run: npm ci
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+
+      # Compile the Android sources so CodeQL can trace/extract the Kotlin.
+      - name: Build Android (debug)
+        if: matrix.build-mode == 'manual'
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon -x lint
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
