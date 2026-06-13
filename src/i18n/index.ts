@@ -1,10 +1,14 @@
 /**
- * i18n setup for make_space (en + it).
+ * i18n setup for make_space.
  *
  * Pure JS (i18next + react-i18next) — no native localization dependency. The
- * initial language is read from React Native core (`I18nManager.localeIdentifier`,
- * e.g. "it_IT") so we avoid pulling in `react-native-localize`. The Supernote
- * host also pushes language changes at runtime via `registerLangListener`.
+ * plugin follows the Supernote system language:
+ *  - initial language from React Native core (`I18nManager.localeIdentifier`,
+ *    which reflects the device/system locale),
+ *  - runtime changes via `PluginManager.registerLangListener`.
+ *
+ * Supernote's own UI languages are en / zh_CN / zh_TW / ja; we additionally
+ * ship Italian. Any language we don't translate falls back to English.
  */
 import {NativeModules} from 'react-native';
 import i18n from 'i18next';
@@ -21,37 +25,67 @@ const resources = {
   it: {translation: it},
 };
 
+const TAG = '[make_space][i18n]';
+const log = (...args: unknown[]) => {
+  if (__DEV__) {
+    console.log(TAG, ...args);
+  }
+};
+
 /**
- * Reduce any device locale identifier to a language we ship.
+ * Map any device/system language code to a language we ship. Codes arrive in
+ * many shapes ("it", "it_IT", "it-IT", "en_US", "zh_CN", "ja"); we only need
+ * the leading subtag. Everything we don't translate (incl. Chinese/Japanese)
+ * falls back to English.
  *
- * Accepts forms like "it", "it_IT", "it-IT" (and underscore/dash variants the
- * Supernote listener uses). Anything that isn't Italian falls back to English,
- * which is also our i18next `fallbackLng`.
- *
- * @param localeIdentifier raw locale string, possibly undefined
- * @returns 'it' for Italian locales, otherwise 'en'
+ * @param code raw locale/language code, possibly undefined
+ * @returns a supported AppLanguage
  */
-export function pickInitialLanguage(
-  localeIdentifier?: string | null,
-): AppLanguage {
-  const code = (localeIdentifier ?? '').toLowerCase().replace('-', '_');
-  return code.startsWith('it') ? 'it' : 'en';
+export function normalizeLang(code?: string | null): AppLanguage {
+  const c = (code ?? '').toLowerCase().replace('-', '_');
+  if (c.startsWith('it')) {
+    return 'it';
+  }
+  return 'en';
+}
+
+// Back-compat alias (used by tests / earlier imports).
+export const pickInitialLanguage = normalizeLang;
+
+/**
+ * Extract the language code from a registerLangListener message. The SDK docs
+ * type it as a bare string (e.g. "zh_CN"), but the .d.ts says `any` and some
+ * firmware has delivered an object ({lang}); accept both.
+ */
+export function langFromMsg(msg: unknown): string | undefined {
+  if (typeof msg === 'string') {
+    return msg;
+  }
+  if (msg && typeof msg === 'object') {
+    const o = msg as {lang?: string; language?: string};
+    return o.lang ?? o.language;
+  }
+  return undefined;
 }
 
 const deviceLocale: string | undefined =
   NativeModules?.I18nManager?.localeIdentifier;
+const initial = normalizeLang(deviceLocale);
+log('initial locale=', deviceLocale, '-> lng=', initial);
 
 i18n.use(initReactI18next).init({
   resources,
-  lng: pickInitialLanguage(deviceLocale),
+  lng: initial,
   fallbackLng: 'en',
   interpolation: {escapeValue: false},
 });
 
-// React to host language changes (msg.lang uses underscores, e.g. "it_IT").
+// Follow the Supernote system language when the user switches it at runtime.
 PluginManager.registerLangListener({
-  onMsg: (msg: {lang: string}) => {
-    const next = pickInitialLanguage(msg?.lang);
+  onMsg: (msg: unknown) => {
+    const raw = langFromMsg(msg);
+    const next = normalizeLang(raw);
+    log('lang event raw=', msg, '-> next=', next);
     if (next !== i18n.language) {
       i18n.changeLanguage(next);
     }
