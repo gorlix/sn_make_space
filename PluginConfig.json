@@ -1,10 +1,12 @@
 {
   "name": "sn_make_space",
-  "desc": "Insert extra writing space on a NOTE page (tap a line, lasso everything below, drag to make room).",
+  "desc": "Insert extra writing space on a NOTE page — press and drag a cut line, then drag everything below it up or down to make room.",
   "iconPath": "assets/icon.png",
-  "versionName": "0.0.1",
+  "versionName": "1.0.0",
   "versionCode": "1",
   "pluginID": "lome8csqs3xu38pv",
   "pluginKey": "sn_make_space",
-  "jsMainPath": "index"
+  "jsMainPath": "index",
+  "author": "Gorlix",
+  "homepage": "https://github.com/gorlix/sn_make_space"
 }
