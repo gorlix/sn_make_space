@@ -10,9 +10,9 @@ Inspired by OneNote's _“Insert extra writing space”_, built as a native Supe
 
 ## 🎥 Demo
 
-<video src="docs/media/demo.mp4" controls width="100%"></video>
+<video src="https://github.com/gorlix/sn_make_space/raw/main/docs/media/demo.mp4" controls width="100%"></video>
 
-> If the player above doesn't load, [watch the demo here](docs/media/demo.mp4).
+> If the player above doesn't load, [watch the demo here](https://github.com/gorlix/sn_make_space/raw/main/docs/media/demo.mp4).
 
 ---
 
