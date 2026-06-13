@@ -55,7 +55,7 @@ jobs:
           java-version: 17
       - name: Set up Android SDK
         if: matrix.build-mode == 'manual'
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
       - name: Install JS deps (needed by the RN Gradle plugin/autolinking)
         if: matrix.build-mode == 'manual'
         run: npm ci
