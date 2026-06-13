@@ -1,8 +1,14 @@
 {
   "hint": {
-    "tapToInsertSpace": "Tocca dove inserire lo spazio"
+    "tapToInsertSpace": "Tocca dove vuoi lo spazio"
   },
   "error": {
     "noNote": "Nessuna nota aperta"
+  },
+  "intro": {
+    "title": "Come funziona Make Space",
+    "body": "Tocca la linea dove ti serve spazio. Tutto ciò che sta sotto viene selezionato — poi trascinalo su o giù per aggiungere o chiudere spazio.",
+    "gotIt": "Ho capito",
+    "dontShowAgain": "Non mostrare più"
   }
 }
