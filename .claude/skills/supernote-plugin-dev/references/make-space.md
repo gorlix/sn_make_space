@@ -19,10 +19,11 @@ button(id 100, NOTE, showType 1)  →  App mounts
   load filePath / pageNum / pageSize        (PluginCommAPI + PluginFileAPI)
   render transparent fullscreen View + thick grey border (visual cue)
   user taps Y  →  computeLassoRect(tapY, viewH, pageW, pageH)
-  PluginCommAPI.lassoElements(rect)         (rect in PIXELS)
-  PluginCommAPI.setLassoBoxState(0)         (show selection box)
+  PluginCommAPI.lassoElements(rect)         (rect in PIXELS; this ALSO shows the box)
   PluginManager.closePluginView()           (hand control back to NOTE)
   → user drags selection natively
+
+  ⚠️ Do NOT call setLassoBoxState(0) here — see §3.
 ```
 
 ## 2. Coordinates — everything is PIXELS here
@@ -63,11 +64,19 @@ Keep this logic out of `App.tsx` so Jest can test it without a device.
 
 ```ts
 const res = await PluginCommAPI.lassoElements(rect);   // APIResponse<boolean>
-if (res.success && res.result) {
-  await PluginCommAPI.setLassoBoxState(0);             // 0 = show box
-}
+// lassoElements ALREADY creates AND shows the selection box (auto-fit to the
+// content, like a hand-drawn lasso). That's all we need — just hand control back.
 await PluginManager.closePluginView();
 ```
+
+**⚠️ Do NOT call `setLassoBoxState(0)` after `lassoElements` (verified on-device, #34).**
+`lassoElements` already shows the box, so the call is redundant — and worse, it puts
+the firmware into the native **transfer/paste mode** (`TransferModeView`,
+`isPenFloatingOnTheScreen`). If the user has anything in the Supernote clipboard, the
+next tap-to-deselect **pastes that clipboard content (scaled up)** instead of
+deselecting. A native hand-drawn lasso never calls `setLassoBoxState` and never
+pastes; that one call was the only difference. Leave `setLassoBoxState` for flows that
+genuinely need to hide/remove the box (states 1/2/3) — not for "show".
 
 **Critical caveat — strokes must be FULLY inside the rect.** `lassoElements` uses
 `findTrailsContourInBox`: any stroke with a contour point outside the rect is **not** selected. For

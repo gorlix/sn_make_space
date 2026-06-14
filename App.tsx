@@ -33,7 +33,6 @@ import {
   getCurrentPageNum,
   getPageSize,
   lassoElements,
-  setLassoBoxState,
 } from './src/sdk';
 
 /** Current NOTE page context needed to build the lasso rect. */
@@ -148,13 +147,16 @@ function App(): React.JSX.Element {
         ctx.height,
       );
       log('lasso rect=', rect);
+      // `lassoElements` ALREADY creates and SHOWS the native selection box
+      // (verified on-device: `AreaSelectionView.setLassoDate` fires and the box
+      // is visible, exactly like a hand-drawn lasso). Do NOT additionally call
+      // `setLassoBoxState(0)`: that was redundant and it armed the native
+      // transfer/paste mode, so when the user had clipboard content, tapping
+      // outside to deselect pasted it (scaled up) instead of deselecting. A
+      // native lasso never calls setLassoBoxState and never pastes — this was
+      // the one and only difference. See #34.
       const res = await lassoElements(rect);
       log('lassoElements ->', res);
-      if (res?.success && res.result) {
-        // 0 = show the selection box so the user sees what will move.
-        const box = await setLassoBoxState(0);
-        log('setLassoBoxState ->', box);
-      }
     } catch (err) {
       log('runCut threw:', String(err));
     } finally {
