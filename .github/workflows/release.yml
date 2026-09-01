@@ -16,6 +16,14 @@ jobs:
         with:
           fetch-depth: 0 # need full history + tags for the annotation message
 
+      - name: Fetch the real annotated tag object
+        # actions/checkout resolves the triggering tag straight to its commit SHA and
+        # creates a local `refs/tags/<tag>` pointing at that commit — not at the
+        # annotated tag object itself. `git tag -l --format='%(contents)'` on that local
+        # ref then silently returns the *commit* message instead of the tag annotation.
+        # Force-fetching the tag ref by name replaces it with the genuine tag object.
+        run: git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
