@@ -1,13 +1,15 @@
 {
   "hint": {
-    "tapToInsertSpace": "Tieni premuto e trascina per posizionare la linea, alza per fare spazio"
+    "tapToInsertSpaceBelow": "Tieni premuto e trascina per posizionare la linea, alza per fare spazio sotto",
+    "tapToInsertSpaceAbove": "Tieni premuto e trascina per posizionare la linea, alza per fare spazio sopra"
   },
   "error": {
     "noNote": "Nessuna nota aperta"
   },
   "intro": {
     "title": "Come funziona Make Space",
-    "body": "Il bordo grigio indica che Make Space è attivo: stai selezionando un'area. Tieni premuto e trascina per posizionare la linea dove ti serve spazio; alza la penna e tutto ciò che sta sotto viene selezionato, poi trascinalo su o giù per aggiungere o chiudere spazio.",
+    "bodyBelow": "Il bordo grigio indica che Make Space è attivo: stai selezionando un'area. Tieni premuto e trascina per posizionare la linea dove ti serve spazio; alza la penna e tutto ciò che sta sotto viene selezionato, poi trascinalo su o giù per aggiungere o chiudere spazio.",
+    "bodyAbove": "Il bordo grigio indica che Make Space è attivo: stai selezionando un'area. Tieni premuto e trascina per posizionare la linea dove ti serve spazio; alza la penna e tutto ciò che sta sopra viene selezionato, poi trascinalo su o giù per aggiungere o chiudere spazio.",
     "gotIt": "Ho capito",
     "dontShowAgain": "Non mostrare più"
   }

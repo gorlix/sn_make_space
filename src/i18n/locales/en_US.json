@@ -1,13 +1,15 @@
 {
   "hint": {
-    "tapToInsertSpace": "Press and drag to set the line, lift to make space"
+    "tapToInsertSpaceBelow": "Press and drag to set the line, lift to make space below",
+    "tapToInsertSpaceAbove": "Press and drag to set the line, lift to make space above"
   },
   "error": {
     "noNote": "No note open"
   },
   "intro": {
     "title": "How Make Space works",
-    "body": "The grey frame means Make Space is active — you're selecting an area. Press and drag to place the cut line where you need room; lift the pen and everything below it is selected, then drag it up or down to add or close space.",
+    "bodyBelow": "The grey frame means Make Space is active — you're selecting an area. Press and drag to place the cut line where you need room; lift the pen and everything below it is selected, then drag it up or down to add or close space.",
+    "bodyAbove": "The grey frame means Make Space is active — you're selecting an area. Press and drag to place the cut line where you need room; lift the pen and everything above it is selected, then drag it up or down to add or close space.",
     "gotIt": "Got it",
     "dontShowAgain": "Don't show again"
   }

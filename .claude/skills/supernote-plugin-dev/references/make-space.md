@@ -226,7 +226,12 @@ icon, requires the beta), catalogued informally on GitHub
 - Repo needs a `LICENSE` — any future listing (InkHub or community catalogue) expects clear terms.
 - `PluginConfig.json` metadata (`name`, `desc`, `iconPath`, `versionName`, `homepage`) already
   reads like a store listing — keep it accurate on every release, it's the likely source InkHub
-  would pull from.
+  would pull from. `name` was the raw `pluginKey` string (`sn_make_space`) until the presentable-
+  name pass — it's independent of `pluginKey`/`pluginID` (those stay untouched, changing them would
+  confuse the host's registry for anyone who already installed the plugin) and is purely the
+  human-facing title shown in Settings → Apps → Plugins and the plugin detail screen. Distinct
+  icons per button (`assets/icon-below.png`/`icon-above.png`) plus a redesigned `assets/icon.png`
+  app icon replaced the generic puzzle-piece template default.
 - Permission hygiene: this plugin declares no `uses-permissions` in `PluginConfig.json` — every SDK
   call it makes (`getPageDisplaySize`, `lassoElements`, `setLassoBoxState`) operates on the
   currently-open file via context, not a `filePath` argument. It briefly did need one by accident:

@@ -35,13 +35,45 @@ AppRegistry.registerComponent(appName, () => App);
 PluginManager.init();
 log('PluginManager.init() done');
 
-// Single toolbar/sidebar button (NOTE only). Tapping it opens the plugin UI
-// (App.tsx) full-screen. `name` is a serialized JSON map so the label follows
-// the device language.
+// Two toolbar/sidebar buttons (NOTE only), one per cut direction. Tapping
+// either opens the same plugin UI (App.tsx) full-screen; App.tsx tells them
+// apart via the Pending Button ID pattern below. `name` is a serialized JSON
+// map so the label follows the device language.
 PluginManager.registerButton(1, ['NOTE'], {
   id: 100,
-  name: JSON.stringify({en: 'Make Space', it: 'Fai Spazio'}),
-  icon: Image.resolveAssetSource(require('./assets/icon.png')).uri,
+  name: JSON.stringify({en: 'Make Space Below', it: 'Fai Spazio Sotto'}),
+  icon: Image.resolveAssetSource(require('./assets/icon-below.png')).uri,
   showType: 1,
 });
-log('button 100 registered');
+PluginManager.registerButton(1, ['NOTE'], {
+  id: 101,
+  name: JSON.stringify({en: 'Make Space Above', it: 'Fai Spazio Sopra'}),
+  icon: Image.resolveAssetSource(require('./assets/icon-above.png')).uri,
+  showType: 1,
+});
+log('buttons 100/101 registered');
+
+// Pending Button ID pattern (references/patterns.md Pattern 5, SKILL.md
+// gotcha #11): on the very first open, this listener can fire before App.tsx
+// has mounted and registered its own, so stash the direction at module level
+// and let App.tsx consume it once on mount. For every later open, PluginHost
+// reuses the same App instance (see make-space.md §4) — App.tsx's own
+// listener (set up once, stays alive) handles those directly.
+let pendingDirection = null;
+PluginManager.registerButtonListener({
+  onButtonPress(event) {
+    pendingDirection = event.id === 101 ? 'above' : 'below';
+    log(
+      'button pressed, id=',
+      event.id,
+      '-> pendingDirection=',
+      pendingDirection,
+    );
+  },
+});
+
+export const checkPendingDirection = () => {
+  const d = pendingDirection;
+  pendingDirection = null;
+  return d;
+};

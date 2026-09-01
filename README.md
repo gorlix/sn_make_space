@@ -1,8 +1,12 @@
 # ✍️ Make Space
 
-> Insert blank writing space anywhere on a Supernote page — just tap a line and slide everything below it up or down.
+[![CI](https://github.com/gorlix/sn_make_space/actions/workflows/ci.yml/badge.svg)](https://github.com/gorlix/sn_make_space/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/gorlix/sn_make_space)](https://github.com/gorlix/sn_make_space/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/gorlix/sn_make_space)](LICENSE)
 
-Ever filled a page by hand and then needed **one more line** in the middle? On paper you're stuck. On a Supernote, **Make Space** gives you room: tap where you need space, and everything underneath slides down (or back up) so you can keep writing.
+> Insert blank writing space anywhere on a Supernote page — just tap a line and slide everything above or below it up or down.
+
+Ever filled a page by hand and then needed **one more line** in the middle? On paper you're stuck. On a Supernote, **Make Space** gives you room: tap where you need space, and everything above or below it slides (or back) so you can keep writing.
 
 Inspired by OneNote's _“Insert extra writing space”_, built as a native Supernote plugin.
 
@@ -13,6 +17,7 @@ Inspired by OneNote's _“Insert extra writing space”_, built as a native Supe
 ![Make Space demo](docs/media/demo.gif)
 
 > Prefer full quality? [Watch the MP4](https://github.com/gorlix/sn_make_space/raw/main/docs/media/demo.mp4).
+> Shows the **below** flow — **above** works the same, mirrored.
 
 ---
 
@@ -20,10 +25,10 @@ Inspired by OneNote's _“Insert extra writing space”_, built as a native Supe
 
 You're writing notes. Two lines are too close together and you need to squeeze something in between. Instead of erasing and rewriting:
 
-1. Open **Make Space** from the toolbar.
+1. Open **Make Space Below** (or **Make Space Above**) from the toolbar, depending on which side of your tap you want to select.
 2. A light **grey frame** appears around the screen — that's your cue.
 3. **Tap** the spot where you want room.
-4. Everything below that point gets selected — now **drag it up or down**: down to open space, up to close a gap.
+4. Everything on that side of the tap gets selected — now **drag it up or down**: open space, or close a gap.
 
 That's it. The move is the Supernote's own selection drag, so **undo works normally**.
 
@@ -55,7 +60,7 @@ Then install it:
    ```
    (or just copy it into the `MyStyle` folder over USB)
 2. On the Supernote: **Settings → Apps → Plugins → Install** and pick `sn_make_space`.
-3. Open a note, tap **Make Space** in the toolbar, and go.
+3. Open a note, tap **Make Space Below** or **Make Space Above** in the toolbar, and go.
 
 > Works in the **NOTE** app.
 
@@ -93,7 +98,7 @@ npm test            # Jest
 
 | Path               | What's inside                                        |
 | ------------------ | ---------------------------------------------------- |
-| `index.js`         | Plugin entry — registers the toolbar button          |
+| `index.js`         | Plugin entry — registers the two toolbar buttons     |
 | `App.tsx`          | The overlay: grey frame, tap handling, lasso + close |
 | `src/makeSpace.ts` | Pure tap-to-rectangle math (unit-tested)             |
 | `src/sdk.ts`       | Typed wrapper over `sn-plugin-lib`                   |
@@ -104,7 +109,7 @@ npm test            # Jest
 
 ## 🧭 How it works under the hood
 
-The Supernote SDK has no “move selection” command, so Make Space leans on what the device already does well: it turns your tap into a **native lasso** of everything below the line, then hands control back so you drag it yourself. Simple, reliable, and undoable.
+The Supernote SDK has no “move selection” command, so Make Space leans on what the device already does well: it turns your tap into a **native lasso** of everything above or below the line, then hands control back so you drag it yourself. Simple, reliable, and undoable.
 
 The full **one-gesture auto-move** (drag once, everything shifts automatically) is the next milestone — see the roadmap.
 
