@@ -23,25 +23,14 @@ const PluginManager = {
 const PluginCommAPI = {
   getCurrentFilePath: jest.fn(() => ok('/storage/emulated/0/Note/demo.note')),
   getCurrentPageNum: jest.fn(() => ok(0)),
+  getPageDisplaySize: jest.fn(() => ok({width: 1404, height: 1872})),
   lassoElements: jest.fn(() => ok(true)),
   setLassoBoxState: jest.fn(() => ok(true)),
   getLassoElements: jest.fn(() => ok([])),
   reloadFile: jest.fn(() => ok(true)),
 };
 
-const PluginFileAPI = {
-  getPageSize: jest.fn(() => ok({width: 1404, height: 1872})),
-  generateNotePng: jest.fn(() => ok(true)),
-};
-
-const PointUtils = {
-  androidPoint2Emr: jest.fn(p => p),
-  emrPoint2Android: jest.fn(p => p),
-};
-
 module.exports = {
   PluginManager,
   PluginCommAPI,
-  PluginFileAPI,
-  PointUtils,
 };
