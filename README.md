@@ -124,3 +124,9 @@ Browse the [open issues](../../issues) to see what's planned.
 ## 🙏 Built with
 
 [React Native](https://reactnative.dev) · [`sn-plugin-lib`](https://docs.supernote.com) · [Supernote docs](https://docs.supernote.com)
+
+---
+
+## 📄 License
+
+[MIT](LICENSE)

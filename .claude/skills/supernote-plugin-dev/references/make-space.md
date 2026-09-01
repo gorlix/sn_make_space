@@ -199,3 +199,30 @@ True one-gesture auto-move: read `getElements`, shift each element's position (s
 point via `ElementDataAccessor.setRange` + `maxY`; geometry/textbox/picture/title: pixel fields),
 then `modifyElements` + `saveCurrentNote` + `reloadFile`. Also page-overflow handling
 (`insertNotePage`) and multi-layer shifting. Not in v1.
+
+## 11. InkHub distribution readiness (tracking, no spec yet)
+
+Firmware Chauvet `3.29.43_beta` (2026-08-26, Manta/Nomad) added a "Plugins" resource type to
+InkHub, Supernote's in-device community sharing hub (existing for notes/templates/stickers). As of
+that beta **no submission process, review criteria, or manifest requirements are published** —
+Supernote's own docs/changelog say only "in the future". Current real-world plugin distribution is
+still community-run: sideload via `MyStyle/` + the firmware's plugin manager (puzzle-piece sidebar
+icon, requires the beta), catalogued informally on GitHub
+([`fharper/awesome-supernote`](https://github.com/fharper/awesome-supernote)) and
+`r/Supernote_dev`. Don't build InkHub-specific submission code against guesses.
+
+**What's genuinely no-regret prep, done now:**
+- Repo needs a `LICENSE` — any future listing (InkHub or community catalogue) expects clear terms.
+- `PluginConfig.json` metadata (`name`, `desc`, `iconPath`, `versionName`, `homepage`) already
+  reads like a store listing — keep it accurate on every release, it's the likely source InkHub
+  would pull from.
+- Permission hygiene: this plugin never declares `uses-permissions` in `PluginConfig.json` because
+  it never touches paths outside the currently-open file (`lassoElements`/`setLassoBoxState`
+  operate on the open note via lasso context, not a `filePath` argument). The 0.1.65
+  `hasPermission`/`requestPermission` gate (see `api-quick-ref.md` §1 "Permissions") is the
+  mechanism most likely reused for any future InkHub review — if a feature ever reads/writes an
+  arbitrary path, declare the permission before submitting anywhere.
+
+**What to watch (re-check before doing more):** re-query the `supernote-docs` MCP and
+`https://support.supernote.com/changelog-for-the-beta-versions-of-manta-and-nomad` periodically for
+"InkHub" + "plugin" — that's where the real spec will land first.
