@@ -29,7 +29,7 @@
     "react": "19.0.0",
     "react-i18next": "^17.0.8",
     "react-native": "0.79.2",
-    "sn-plugin-lib": "^0.1.19"
+    "sn-plugin-lib": "^0.1.65"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
