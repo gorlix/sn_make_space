@@ -7,7 +7,7 @@
  * real shape so callers get proper type narrowing on `success`/`result` instead
  * of fighting `Object`. Keep all such casts here, in one place.
  */
-import {PluginCommAPI, PluginFileAPI, PluginManager} from 'sn-plugin-lib';
+import {PluginCommAPI, PluginManager} from 'sn-plugin-lib';
 
 import type {Rect} from './makeSpace';
 
@@ -30,8 +30,16 @@ export const getCurrentFilePath = () =>
 export const getCurrentPageNum = () =>
   typed<number>(PluginCommAPI.getCurrentPageNum());
 
-export const getPageSize = (notePath: string, page: number) =>
-  typed<Size>(PluginFileAPI.getPageSize(notePath, page));
+/**
+ * Display size of the page currently open in the host. Unlike
+ * `PluginFileAPI.getPageSize(filePath, page)`, this doesn't take a `filePath`
+ * and isn't gated behind the `FILE:READ` permission introduced in
+ * sn-plugin-lib 0.1.65 — the host started denying `getPageSize` calls against
+ * `/storage/emulated/0/Note/...` under firmware Chauvet 3.29.43_beta, which
+ * silently broke the whole cut flow (see git history for the incident).
+ */
+export const getPageDisplaySize = () =>
+  typed<Size>(PluginCommAPI.getPageDisplaySize());
 
 export const lassoElements = (rect: Rect) =>
   typed<boolean>(PluginCommAPI.lassoElements(rect));
