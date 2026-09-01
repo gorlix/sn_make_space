@@ -1,6 +1,6 @@
 {
-  "name": "sn_make_space",
-  "desc": "Insert extra writing space on a NOTE page — press and drag a cut line, then drag everything below it up or down to make room.",
+  "name": "Make Space",
+  "desc": "Insert extra writing space anywhere on a NOTE page — tap a line, then drag everything above or below it to open or close room. OneNote-style, fully undoable.",
   "iconPath": "assets/icon.png",
   "versionName": "0.5.0",
   "versionCode": "1",

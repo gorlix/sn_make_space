@@ -3,8 +3,10 @@
  *
  * Full-screen, transparent overlay framed by a thick grey border. Press and
  * drag with the pen: a thin guide line follows to show exactly where the cut
- * will be; lift to commit — everything on the current NOTE page below that line
- * is lassoed and the plugin closes so you can drag the selection to make space.
+ * will be; lift to commit — everything on the current NOTE page above or
+ * below that line (whichever sidebar button opened the plugin — id 100=below,
+ * 101=above, see `direction` below) is lassoed and the plugin closes so you
+ * can drag the selection to make space.
  *
  * The move and its undo are native NOTE behavior — this plugin only builds the
  * selection. See .claude/skills/supernote-plugin-dev/references/make-space.md.
@@ -24,8 +26,10 @@ import {
   View,
 } from 'react-native';
 import {useTranslation} from 'react-i18next';
+import {PluginManager} from 'sn-plugin-lib';
 
-import {computeLassoRect} from './src/makeSpace';
+import {checkPendingDirection} from './index';
+import {computeLassoRect, type CutDirection} from './src/makeSpace';
 import {dismissIntro, isIntroDismissed} from './src/prefs';
 import {closePluginView, getPageDisplaySize, lassoElements} from './src/sdk';
 
@@ -82,6 +86,15 @@ function App(): React.JSX.Element {
   // lasso/close window so it doesn't flash back on (a brief flash just ghosts on
   // e-ink). Set synchronously on release so there's no frame where it shows.
   const [committing, setCommitting] = useState(false);
+  // Which side of the cut line gets selected — set by which sidebar button
+  // (100=below, 101=above) opened the plugin. Seeded from the pending ID
+  // stashed by index.js's module-level listener (covers the very first open,
+  // before this component existed to register its own listener below);
+  // every later press is caught live by the listener in the mount effect,
+  // since PluginHost reuses this App instance instead of remounting it.
+  const [direction, setDirection] = useState<CutDirection>(
+    () => checkPendingDirection() ?? 'below',
+  );
 
   // Measured height of the overlay (DP). Seeded with the window height so the
   // first commit still maps sensibly if it lands before onLayout fires.
@@ -99,7 +112,22 @@ function App(): React.JSX.Element {
       const ctx = await loadContext('mount');
       setFailed(ctx == null);
     })();
-    return () => log('App unmounted');
+    // Catches every button press AFTER this first mount — this effect only
+    // ever runs once (App instance reuse, see class doc), but the listener
+    // itself stays live for the component's whole lifetime, so it keeps
+    // receiving events across opens/closes. The pending-ID read above only
+    // covers the very first press, before this listener existed yet.
+    const sub = PluginManager.registerButtonListener({
+      onButtonPress: event => {
+        const next = event.id === 101 ? 'above' : 'below';
+        log('onButtonPress id=', event.id, '-> direction=', next);
+        setDirection(next);
+      },
+    });
+    return () => {
+      log('App unmounted');
+      sub.remove();
+    };
   }, []);
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -132,8 +160,9 @@ function App(): React.JSX.Element {
         viewHeight.current,
         ctx.width,
         ctx.height,
+        direction,
       );
-      log('lasso rect=', rect);
+      log('direction=', direction, 'lasso rect=', rect);
       // `lassoElements` ALREADY creates and SHOWS the native selection box
       // (verified on-device: `AreaSelectionView.setLassoDate` fires and the box
       // is visible, exactly like a hand-drawn lasso). Do NOT additionally call
@@ -207,7 +236,13 @@ function App(): React.JSX.Element {
         <View style={styles.hintBar} pointerEvents="none">
           <View style={styles.hintPill}>
             <Text style={styles.hintText}>
-              {failed ? t('error.noNote') : t('hint.tapToInsertSpace')}
+              {failed
+                ? t('error.noNote')
+                : t(
+                    direction === 'below'
+                      ? 'hint.tapToInsertSpaceBelow'
+                      : 'hint.tapToInsertSpaceAbove',
+                  )}
             </Text>
           </View>
         </View>
@@ -223,7 +258,9 @@ function App(): React.JSX.Element {
         <Pressable style={styles.introBackdrop} onPress={() => {}}>
           <View style={styles.introCard}>
             <Text style={styles.introTitle}>{t('intro.title')}</Text>
-            <Text style={styles.introBody}>{t('intro.body')}</Text>
+            <Text style={styles.introBody}>
+              {t(direction === 'below' ? 'intro.bodyBelow' : 'intro.bodyAbove')}
+            </Text>
             <View style={styles.introButtons}>
               <Pressable
                 style={styles.introBtnGhost}

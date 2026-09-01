@@ -1,6 +1,7 @@
 {
   "name": "sn_make_space",
   "version": "0.0.1",
+  "description": "Insert extra writing space anywhere on a Supernote NOTE page — tap a line, drag to open or close room. Native Supernote plugin.",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
