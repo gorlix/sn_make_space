@@ -179,6 +179,17 @@ view≠page scaling, and that `left=0`/`right=pageW`/`bottom=pageH` always hold.
   toolchain + JDK 17), use the **annotated tag message** as release notes, attach the `.snplg`.
   Create release tags with `git tag -a vX.Y.Z -m "..."` + `git push origin vX.Y.Z`. Verify
   `buildPlugin.sh` is non-interactive in CI (it generates `pluginID` on first build).
+- **⚠️ Always `git pull origin main` (not just `git checkout main`) immediately before tagging.**
+  `git checkout main` only reports "up to date with origin/main" against the last-fetched local
+  remote-tracking ref — it does **not** implicitly fetch. After merging a PR from a *different*
+  local branch (the normal flow here), local `main` can silently be behind `origin/main` by one or
+  more just-merged PRs. Tagging that stale HEAD ships a release **missing the very fix it claims to
+  contain**, with no error at any step — `typecheck`/`lint`/`test:ci` all pass because they run
+  against the (older, still-valid) code that got tagged. This happened for real: `v0.5.3` was
+  first tagged one PR short of the fix it was supposed to ship, had to be deleted
+  (`gh release delete vX.Y.Z --yes --cleanup-tag` + `git tag -d` locally) and retagged after an
+  explicit `git pull`. Before pushing any release tag, sanity-check with
+  `git log --oneline -1` against `git log --oneline origin/main -1` (post-fetch) — they must match.
 
 ## 9. Build / deploy / debug (on-device)
 
