@@ -9,6 +9,7 @@ import {PluginManager} from 'sn-plugin-lib';
 
 import App from './App';
 import {name as appName} from './app.json';
+import {versionCode, versionName} from './PluginConfig.json';
 // Side-effect import: initializes i18next before any UI renders.
 import './src/i18n';
 
@@ -19,6 +20,13 @@ const log = (...args) => {
     console.log(TAG, ...args);
   }
 };
+
+// Deliberately NOT gated behind __DEV__: `console.log` calls above are silent
+// in release bundles, which made it impossible to tell from `adb logcat`
+// whether a sideloaded .snplg was actually the build just pushed or a stale
+// one the host had cached (see the getPageSize/getPageDisplaySize incident).
+// This one line always fires so the installed version is verifiable on-device.
+console.log(TAG, `v${versionName} (code ${versionCode}) starting`);
 
 log('index.js loaded; registering component', appName);
 AppRegistry.registerComponent(appName, () => App);

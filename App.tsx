@@ -27,16 +27,10 @@ import {useTranslation} from 'react-i18next';
 
 import {computeLassoRect} from './src/makeSpace';
 import {dismissIntro, isIntroDismissed} from './src/prefs';
-import {
-  closePluginView,
-  getCurrentFilePath,
-  getCurrentPageNum,
-  getPageSize,
-  lassoElements,
-} from './src/sdk';
+import {closePluginView, getPageDisplaySize, lassoElements} from './src/sdk';
 
 /** Current NOTE page context needed to build the lasso rect. */
-type PageContext = {path: string; page: number; width: number; height: number};
+type PageContext = {width: number; height: number};
 
 const TAG = '[make_space]';
 // Verbose logging so the whole flow is visible in `adb logcat -s ReactNativeJS:V`.
@@ -48,32 +42,25 @@ const log = (...args: unknown[]) => {
 };
 
 /**
- * Read the current note path + page + pixel size. Returns null (and logs why)
- * if anything is missing — e.g. no note open. Called on mount (for the hint)
- * and fresh on every commit (so it never acts on a stale page).
+ * Read the current page's pixel size. Returns null (and logs why) if
+ * unavailable — e.g. no note open. Called on mount (for the hint) and fresh
+ * on every commit (so it never acts on a stale page).
+ *
+ * Uses `getPageDisplaySize()` (current-page context, like `lassoElements`)
+ * rather than `PluginFileAPI.getPageSize(filePath, page)`: the latter is
+ * gated behind the `FILE:READ` permission and got silently denied under
+ * firmware Chauvet 3.29.43_beta, breaking the cut flow before it ever
+ * reached `lassoElements`.
  */
 async function loadContext(where: string): Promise<PageContext | null> {
   try {
-    const fp = await getCurrentFilePath();
-    log(where, 'getCurrentFilePath ->', fp);
-    const pn = await getCurrentPageNum();
-    log(where, 'getCurrentPageNum ->', pn);
-    if (!fp?.success || !fp.result || !pn?.success || pn.result == null) {
-      log(where, 'context unavailable (no note?)');
-      return null;
-    }
-    const ps = await getPageSize(fp.result, pn.result);
-    log(where, 'getPageSize ->', ps);
+    const ps = await getPageDisplaySize();
+    log(where, 'getPageDisplaySize ->', ps);
     if (!ps?.success || !ps.result) {
-      log(where, 'page size unavailable');
+      log(where, 'page size unavailable (no note open?)');
       return null;
     }
-    return {
-      path: fp.result,
-      page: pn.result,
-      width: ps.result.width,
-      height: ps.result.height,
-    };
+    return {width: ps.result.width, height: ps.result.height};
   } catch (err) {
     log(where, 'loadContext threw:', String(err));
     return null;

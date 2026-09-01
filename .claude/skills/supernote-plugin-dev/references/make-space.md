@@ -16,7 +16,7 @@ Flow:
 
 ```
 button(id 100, NOTE, showType 1)  →  App mounts
-  load filePath / pageNum / pageSize        (PluginCommAPI + PluginFileAPI)
+  load current page's pixel size            (PluginCommAPI.getPageDisplaySize)
   render transparent fullscreen View + thick grey border (visual cue)
   user taps Y  →  computeLassoRect(tapY, viewH, pageW, pageH)
   PluginCommAPI.lassoElements(rect)         (rect in PIXELS; this ALSO shows the box)
@@ -46,7 +46,7 @@ export type Rect = {left: number; top: number; right: number; bottom: number};
  *
  * @param tapY   tap Y in DP, from PressEvent.nativeEvent.locationY
  * @param viewH  measured height of the plugin view in DP (onLayout)
- * @param pageW  page width  in pixels (PluginFileAPI.getPageSize)
+ * @param pageW  page width  in pixels (PluginCommAPI.getPageDisplaySize)
  * @param pageH  page height in pixels
  * @returns lasso rect in page pixels: {left:0, top, right:pageW, bottom:pageH}
  */
@@ -216,9 +216,10 @@ icon, requires the beta), catalogued informally on GitHub
 - `PluginConfig.json` metadata (`name`, `desc`, `iconPath`, `versionName`, `homepage`) already
   reads like a store listing — keep it accurate on every release, it's the likely source InkHub
   would pull from.
-- Permission hygiene: this plugin never declares `uses-permissions` in `PluginConfig.json` because
-  it never touches paths outside the currently-open file (`lassoElements`/`setLassoBoxState`
-  operate on the open note via lasso context, not a `filePath` argument). The 0.1.65
+- Permission hygiene: this plugin declares no `uses-permissions` in `PluginConfig.json` — every SDK
+  call it makes (`getPageDisplaySize`, `lassoElements`, `setLassoBoxState`) operates on the
+  currently-open file via context, not a `filePath` argument. It briefly did need one by accident:
+  see §12, a real incident where an unrelated call silently tripped the gate. The 0.1.65
   `hasPermission`/`requestPermission` gate (see `api-quick-ref.md` §1 "Permissions") is the
   mechanism most likely reused for any future InkHub review — if a feature ever reads/writes an
   arbitrary path, declare the permission before submitting anywhere.
@@ -226,3 +227,26 @@ icon, requires the beta), catalogued informally on GitHub
 **What to watch (re-check before doing more):** re-query the `supernote-docs` MCP and
 `https://support.supernote.com/changelog-for-the-beta-versions-of-manta-and-nomad` periodically for
 "InkHub" + "plugin" — that's where the real spec will land first.
+
+## 12. Incident: `getPageSize` silently broke the cut flow under 0.1.65 (2026-09-01)
+
+Right after the 0.1.65 bump (§11), the plugin stopped selecting anything: `lassoElements` was never
+even reached. Root cause, found via `adb logcat`: `PluginFileAPI.getPageSize(filePath, page)` —
+used since v1 to convert the tap into a pixel rect — got `FILE:READ`-gated by firmware Chauvet
+`3.29.43_beta`. The API didn't throw; it just resolved as unavailable, so `loadContext()` returned
+null and `runCut` bailed out silently before calling the lasso at all. See SKILL.md gotcha #38 for
+the full log signature (`PluginSec: DENY reason=sdcard_no_read`) and gotcha #40 for why the JS
+logging didn't show anything either (release builds are always `--dev false`, silencing every
+`__DEV__`-gated `log()` call — the fix included one deliberately ungated startup log line for this
+reason).
+
+**Fix**: swap `PluginFileAPI.getPageSize(filePath, page)` for `PluginCommAPI.getPageDisplaySize()`
+— no `filePath` argument, current-page context like `lassoElements`, not gated. This also removed
+the now-pointless `getCurrentFilePath`/`getCurrentPageNum` calls that existed only to build the
+`getPageSize` arguments (see `src/sdk.ts`, `App.tsx`).
+
+**A second, unrelated trap surfaced during the same debugging session**: `adb push`-ing a rebuilt
+`.snplg` to `MyStyle/` and tapping "reinstall" in Settings → Apps → Plugins re-ran the *old* build
+— the host reinstalls from its own managed copy at `MyStyle/Plugins/<name>.snplg`, not from
+`MyStyle/` root. Looked exactly like "the fix did nothing" until caught by comparing file
+size/mtime on-device. See SKILL.md gotcha #39.

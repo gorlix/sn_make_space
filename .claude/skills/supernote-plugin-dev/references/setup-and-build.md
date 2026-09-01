@@ -148,6 +148,15 @@ adb push build\outputs\my-plugin.snplg /storage/emulated/0/MyStyle/
 
 Then install on device via Settings → Apps → Plugins → Add Plugin.
 
+**⚠️ Iterating on an already-installed plugin**: `adb push`-ing a new `.snplg` to `MyStyle/`
+root and tapping the existing plugin's "reinstall"/"update" in Settings → Apps → Plugins does
+**not** pick it up — the host reinstalls from its own managed copy at
+`MyStyle/Plugins/<name>.snplg`, which is a different file. Confirmed on-device: this silently
+reran the old build (same `versionName`/`versionCode`), which looks exactly like "the fix did
+nothing." Either push directly to `MyStyle/Plugins/<name>.snplg` (overwrite in place, then
+reinstall), or use "Add Plugin" to browse to the new file explicitly instead of reinstalling the
+existing entry. See SKILL.md gotcha #39.
+
 ### Verifying ADB Connection
 
 ```powershell
