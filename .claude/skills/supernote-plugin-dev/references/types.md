@@ -438,6 +438,12 @@ output). It appears in `Stroke.recognPoints: ElementDataAccessor<RecognData>`.
 |----------|-------|
 | `PointUtils.NORMAL_PAGE_SIZE` | `{ width: 1404, height: 1872 }` |
 | `PointUtils.A5X2_PAGE_SIZE` | `{ width: 1920, height: 2560 }` |
+| `PointUtils.NORMAL_PAGE_MAX_SIZE` | Added in 0.1.65. Not yet documented on the public docs site — query the MCP or inspect `node_modules/sn-plugin-lib` before relying on the exact value. |
+| `PointUtils.A6X2_PAGE_MAX_SIZE` | Added in 0.1.65. Same caveat as above. |
+
+**Removed in 0.1.65**: `PointUtils.getNotePageSize(orientation, machineType)` — no replacement
+method on `PointUtils`. Use `PluginFileAPI.getPageSize(filePath, page)` or (for the currently-open
+file) `PluginCommAPI.getPageDisplaySize()` instead.
 
 ---
 

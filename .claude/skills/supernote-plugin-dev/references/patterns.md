@@ -268,19 +268,22 @@ function App(): React.JSX.Element {
 
 ## Pattern 9: Plugin Lifecycle — Reset State on Close
 
-Use `addPluginLifeListener` to reset UI state whenever the plugin panel is closed. Without this, re-opening the panel may show stale UI from a previous session.
+Use `registerPluginLifeListener` to reset UI state whenever the plugin panel is closed. Without this, re-opening the panel may show stale UI from a previous session.
+
+**⚠️ 0.1.65 breaking change**: the old `addPluginLifeListener({onStart, onStop})` shape is gone.
+`registerPluginLifeListener` now takes a plain `PluginEventListener` (`{onMsg(msg)}`) and hands you
+a raw `msg.state` instead of separate callbacks — map the state values yourself.
 
 ```ts
 // In your root component's useEffect
 import { PluginManager } from 'sn-plugin-lib';
 
 useEffect(() => {
-  const lifeSub = PluginManager.addPluginLifeListener({
-    onStart: () => {
-      // Optional: refresh data on re-open
-    },
-    onStop: () => {
-      // Reset UI — called when user closes the plugin panel
+  const lifeSub = PluginManager.registerPluginLifeListener({
+    onMsg: msg => {
+      // msg.state is the lifecycle state value; confirm the mapping via the MCP
+      // for the states this project cares about before branching on it.
+      // Treat "panel closed" as the reset trigger:
       setCurrentScreen(null);
       setSelectedItems([]);
     },
@@ -289,6 +292,10 @@ useEffect(() => {
   return () => lifeSub.remove();
 }, []);
 ```
+
+Registration depends on the event channel set up by `PluginManager.init()` — call `init()` first.
+If you register after a lifecycle event already fired (race on mount), the SDK redelivers the last
+event as long as it happened within the past second, so a late listener still catches it.
 
 ---
 
@@ -396,3 +403,37 @@ useEffect(() => {
 ## Pattern 16: Scoped Pen Disable Around a Pen Operation
 
 → See [`pen-emr.md`](pen-emr.md) for the engage/release recipe, dual-pipeline explanation, and timing requirements.
+
+---
+
+## Pattern 17: Requesting File Permissions Before Access (0.1.65+)
+
+`FILE:READ`/`FILE:WRITE`/`FILE:DELETE`/`INTERNET` are gated at runtime for anything outside the
+plugin's own private data directory (`Document`, `EXPORT`, `INBOX`, `MyStyle`, `Note`,
+`SCREENSHOT`, external SD/OTG). Declare the permission in `PluginConfig.json`'s `uses-permissions`
+first — calling `hasPermission`/`requestPermission` for an undeclared permission throws (error
+`1500`). This project's own operations (`lassoElements`, `setLassoBoxState`) stay inside the
+currently-open file via `PluginCommAPI` and don't need this; it matters only if a feature starts
+reading/writing arbitrary paths (e.g. sticker export, cross-note operations).
+
+```ts
+import { PluginManager } from 'sn-plugin-lib';
+
+async function ensureWriteAccess(): Promise<boolean> {
+  const has = await PluginManager.hasPermission('plugin.permission.FILE:WRITE');
+  if (has === 1) return true;
+
+  const choice = await PluginManager.requestPermission(
+    'plugin.permission.FILE:WRITE',
+    // Shown only if the user previously chose "don't allow" — omit for host default text.
+  );
+  return choice === 1 || choice === 2; // 1 = this session only, 2 = always
+}
+```
+
+**Gotchas**:
+- `"Allow this time only"` (`1`) is revoked when the plugin exits — re-check with `hasPermission`
+  on next launch, don't cache the result across sessions.
+- `-1` (dialog dismissed without a choice) is treated as deny, but the dialog reappears on the next
+  `requestPermission` call — don't loop-retry immediately, surface a UI affordance instead.
+- `desc` only customizes the "already denied" dialog copy; it's ignored for every other state.

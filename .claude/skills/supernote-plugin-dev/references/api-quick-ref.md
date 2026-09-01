@@ -2,6 +2,10 @@
 
 All imports from `sn-plugin-lib`. All async methods return `APIResponse<T>` unless noted.
 
+Signatures verified against `sn-plugin-lib@0.1.65` (this project pins `^0.1.65`, up from
+`^0.1.19`). Anything tagged "Added in 0.1.43" or "0.1.65" documents an SDK version floor; always
+re-check the `supernote-docs` MCP for the current signature before writing code.
+
 ---
 
 ## §1 PluginManager
@@ -20,6 +24,8 @@ import { PluginManager } from 'sn-plugin-lib';
 | `getDeviceType()` | `Promise<number>` | Device type: 0=A5, 1=A6, 2=A6X, 3=A5X, 4=Nomad, 5=Manta |
 | `closePluginView()` | `Promise<boolean>` | Close the plugin UI container |
 | `showPluginView()` | `Promise<boolean>` | Show the plugin view while running in background. Added in 0.1.43. |
+| `hasPermission(permission: string)` | `Promise<number>` | `0`=not granted, `1`=granted. Added in 0.1.65. See "Permissions" below. |
+| `requestPermission(permission: string, desc?: string)` | `Promise<number>` | Prompts the host permission dialog. Returns `0`=deny, `1`=allow this time, `2`=always allow, `-1`=dialog dismissed (treated as deny). Added in 0.1.65. |
 
 ### Button Registration
 
@@ -91,12 +97,20 @@ registerLangListener(listener: {
 ```
 
 ```ts
-addPluginLifeListener(listener: {
-  onStart?: () => void;
-  onStop?: () => void;
-}): { remove(): void };
-// onStop fires when the plugin panel is closed — use it to reset UI state (e.g. setStickerVisible(null))
+registerPluginLifeListener(listener: PluginEventListener): PluginEventSubscription;
+// ⚠️ BREAKING in 0.1.65: replaces the old `addPluginLifeListener({onStart, onStop})`.
+// New shape: listener.onMsg(msg) where msg.state is the lifecycle state value (no onStart/onStop split).
+// Requires PluginManager.init() to have run first (depends on the internal event channel).
+// If registered late, the last lifecycle event is redelivered if it fired within the past 1s.
 ```
+
+### Permissions (0.1.65+)
+
+Supported `permission` strings: `plugin.permission.FILE:READ`, `plugin.permission.FILE:WRITE`,
+`plugin.permission.FILE:DELETE`, `plugin.permission.INTERNET`. Must be declared in
+`PluginConfig.json`'s `uses-permissions` first, or the call throws (error code `1500`). The
+plugin's own private data dir is always readable/writable/deletable without any of these. See
+`references/patterns.md` for the request flow.
 
 ---
 
@@ -178,8 +192,9 @@ import { PluginCommAPI } from 'sn-plugin-lib';
 | Method | Signature | Notes |
 |--------|-----------|-------|
 | `getLassoRect` | `() → APIResponse<Rect>` | Lasso bounding box (pixel coords). |
-| `resizeLassoRect` | `(rect: Rect) → APIResponse<boolean>` | Resize lasso box. **Only proportional scaling supported.** |
+| `resizeLassoRect` | `(rect: Rect, rotationDegree?: number) → APIResponse<boolean>` | Resize lasso box. **Only proportional scaling supported.** `rotationDegree` added in 0.1.65. |
 | `lassoElements` | `(rect: Rect) → APIResponse<boolean>` | Programmatically create a lasso selection from a rectangle (pixel coords). After success, other lasso APIs become usable. |
+| `flipLassoElements` | `(flipType: number) → APIResponse<boolean>` | Flip lasso-selected elements in place (no duplicate created). `flipType`: 1=horizontal, 2=vertical. Added in 0.1.65. |
 | `getLassoElements` | `() → APIResponse<Element[]>` | All elements in lasso selection. |
 | `getLassoElementTypeCounts` | `() → APIResponse<object>` | Detailed count object: `{trailNum, trailLinkNum, textLinkNum, todoLinkNum, titleNum, normalTextBoxNum, digestTextBoxNum, digestTextBoxEditableNum, geometryNum, straightLineNum, circleNum, ellipseNum, polygonNum}`. |
 | `deleteLassoElements` | `() → APIResponse<boolean>` | Delete all lasso-selected elements. |
@@ -195,6 +210,9 @@ import { PluginCommAPI } from 'sn-plugin-lib';
 | `getCurrentFilePath` | `() → APIResponse<string>` | Currently open file path. |
 | `reloadFile` | `() → APIResponse<boolean>` | Reload currently opened file. |
 | `getPenInfo` | `() → APIResponse<PenInfo>` | Get currently selected pen type in the app. |
+| `canHandwrite` | `() → APIResponse<boolean>` | Whether the current view supports EMR handwriting. Added in 0.1.65. |
+| `jumpToPage` | `(page: number) → APIResponse<boolean>` | Jump to a page in the current file, 0-indexed. Added in 0.1.65. |
+| `getPageDisplaySize` | `() → APIResponse<Size>` | Display size of the **currently opened page**. Use this (not `PluginFileAPI.getPageSize`) before `modifyPageElements`/`insertPageElements`/`deletePageElements`/`batchUpdatePageElements`, otherwise position data may not match. Added in 0.1.65. |
 
 ### Recognition
 
@@ -216,6 +234,19 @@ import { PluginCommAPI } from 'sn-plugin-lib';
 | `insertGeometry` | `(geometry: Geometry) → APIResponse<boolean>` | Insert geometry into current page. Pixel coords. Set `geometry.showLassoAfterInsert` to auto-select with lasso after insertion. |
 | `getNoteSystemTemplates` | `() → APIResponse<Template[]>` | System note templates. |
 | `insertFiveStar` | `(starPoints: Point[]) → APIResponse<boolean>` | Insert five-star into current page/layer. **Pixel coords.** Must be 6 points with first===last. |
+| `fillRegionByPoint` | `(point: {x, y}, color: number) → APIResponse<boolean>` | Fill the closed region containing `point` with `color`. Added in 0.1.65. |
+
+### Current-File Page Element CRUD (0.1.65+)
+
+Operates on the file **currently open in the host**, unlike `PluginFileAPI`'s element CRUD which
+takes an explicit `filePath`. Always call `getPageDisplaySize()` first for correct positioning.
+
+| Method | Signature | Notes |
+|--------|-----------|-------|
+| `modifyPageElements` | `(elements: Element[], page: number, layer?: number \| null) → APIResponse<number[]>` | Elements must already exist on the page (matched by `uuid`). `layer`: omit for note files to use current layer; ignored for recognized notes and doc files; else `0-3`. Returns modified in-page indices (1-based). |
+| `insertPageElements` | `(elements: Element[], page: number, layer?: number \| null) → APIResponse<boolean>` | Same `layer` rules as above. |
+| `deletePageElements` | `(numsInPage: number[], page: number, layer?: number \| null) → APIResponse<boolean>` | Delete by in-page index. |
+| `batchUpdatePageElements` | `(deleteNumList: number[], elements: Element[], page: number, layer?: number \| null) → APIResponse<boolean>` | Terminal deletes first, then inserts — use for atomic replace-in-place. |
 
 ---
 
@@ -236,8 +267,12 @@ import { PluginFileAPI } from 'sn-plugin-lib';
 | `deleteElements` | `(filePath, page, numsInPage: number[]) → APIResponse<boolean>` | Delete elements by their indices in the page. |
 | `getElementCounts` | `(pageNum, filePath) → APIResponse<number>` | Count elements on a page. |
 | `getElementNumList` | `(pageNum, filePath, elementType) → APIResponse<number[]>` | List element nums by type. |
-| `getElement` | `(filePath, page, numInPage) → APIResponse<Element>` | Get single element by page position. |
+| `getElement` | `(filePath, page, numInPage) → APIResponse<Element>` | Get single element by page position. `numInPage` is **1-indexed** (matches `Element.numInPage`). |
 | `getLastElement` | `() → APIResponse<Element>` | Get the last element on the **current displayed page**. Takes no parameters — always operates on the page the user is currently viewing. |
+| `openFile` | `(filePath: string, page: number) → APIResponse<boolean>` | Open the given file. `page >= 0` jumps to that page; `page = -1` keeps the last-viewed page. Added in 0.1.65. |
+| `getPathEncryptionStatus` | `(filePath: string) → APIResponse<number>` | `0`=not encrypted, `1`=encrypted+locked, `2`=encrypted+unlocked in this plugin session. Added in 0.1.65. |
+| `unlockPathWithPassword` | `(filePath: string, password: string) → APIResponse<boolean>` | Unlock an encrypted file/dir for the current plugin session. Added in 0.1.65. |
+| `lockPathAccess` | `(filePath: string) → APIResponse<boolean>` | Clear the session's unlock record for a path; subsequent access needs `unlockPathWithPassword` again. No-op on unencrypted paths. Added in 0.1.65. |
 
 ### Page Management
 
@@ -349,6 +384,7 @@ import { PluginDocAPI } from 'sn-plugin-lib';
 | `getCurrentDocText` | `(page: number) → APIResponse<string>` | Get text of specified page. |
 | `getLastSelectedText` | `() → APIResponse<string>` | Get the most recently selected text, even when no text is currently selected. |
 | `getCurrentTotalPages` | `() → APIResponse<number>` | Total pages in document. |
+| `generateCurrentDocImage` | `(page: number, pngPath: string, size: {width, height}, type: number) → APIResponse<boolean>` | Render a page of the **currently open** document to PNG. `size` 1~5120px per side. `type`: 0=default, 1=with text-selection styles (highlight/underline). **⚠️ Renamed in 0.1.65** from `generateDocImage(docPath, page, pngPath, size)` — the old form took an explicit `docPath` and no `type`; the new form always targets the current doc and adds `type`. |
 
 ---
 
@@ -369,7 +405,14 @@ import { PointUtils } from 'sn-plugin-lib';
 - `1920×2560` (Manta portrait) → EMR max `21632×16224`
 - `2560×1920` (Manta landscape) → EMR max `16224×21632`
 
-**Constants**: `PointUtils.NORMAL_PAGE_SIZE`, `PointUtils.A5X2_PAGE_SIZE`, `PointUtils.MACHINE_TYPE_*` (A5=0..Manta=5), `PointUtils.ROTATION_*` (orientation constants). See `references/types.md §PointUtils Constants` for full list.
+**Constants**: `PointUtils.NORMAL_PAGE_SIZE`, `PointUtils.A5X2_PAGE_SIZE`, `PointUtils.MACHINE_TYPE_*` (A5=0..Manta=5), `PointUtils.ROTATION_*` (orientation constants). 0.1.65 adds `PointUtils.A6X2_PAGE_MAX_SIZE` and `PointUtils.NORMAL_PAGE_MAX_SIZE`. See `references/types.md §PointUtils Constants` for full list.
+
+**⚠️ 0.1.65**: `getRealMaxX`/`getRealMaxY` now also return `28854` and `21098` for an additional
+device/pageSize combination not yet in the public docs table above (the docs site still lists only
+the 4 pairs shown, but the SDK type union is `21632 | 15819 | 28854 | 21098 | 16224 | 11864`) —
+query the MCP or test on-device before relying on it. Also **removed in 0.1.65**:
+`PointUtils.getNotePageSize(orientation, machineType)` — no replacement in `PointUtils`; get page
+size from `PluginFileAPI.getPageSize(filePath, page)` or `PluginCommAPI.getPageDisplaySize()` (current file) instead.
 
 ---
 
@@ -419,6 +462,7 @@ import { EventType, type MotionEvent, type Pointer } from 'sn-plugin-lib';
 | `PEN_UP` | `"event_pen_up"` | `registerEventListener` |
 | `IMPORT_STICKER` | `"event_import_sticker"` | `registerEventListener` |
 | `MOTION_EVENT` | `"motion_event"` | `registerMotionListener` (0.1.43+) |
+| `PLUGIN_LIFE` | `"plugin_life"` | `registerPluginLifeListener` (0.1.65+) |
 
 ### MotionEvent
 

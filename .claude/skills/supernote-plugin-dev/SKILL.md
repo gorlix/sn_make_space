@@ -7,6 +7,19 @@ description: "Build, debug, and extend Supernote e-ink device plugins using the 
 
 You are an expert Supernote plugin developer. Supernote plugins extend the NOTE (handwriting notebook) and DOC (document reader) apps on Supernote e-ink devices. Plugins run inside a **PluginHost** process that provides a React Native runtime, and communicate with NOTE/DOC via AIDL + SDK interfaces.
 
+## 📦 SDK version
+
+This project pins `sn-plugin-lib` `^0.1.65` (bumped 2026-09-01 from `^0.1.19`; installed
+`node_modules` had drifted to `0.1.43`). `0.1.65` is a superset for everything this project uses —
+`typecheck`/`lint`/`test:ci` all pass unchanged, no source changes were required for the bump
+itself. Notable SDK changes between `0.1.19` and `0.1.65` that affect the reference docs below:
+`PluginManager.addPluginLifeListener` → `registerPluginLifeListener` (breaking, different callback
+shape), `PluginDocAPI.generateDocImage` → `generateCurrentDocImage` (renamed + new `type` param),
+`PointUtils.getNotePageSize` removed (no replacement), new `hasPermission`/`requestPermission`
+runtime permission gate, and new current-file page-element CRUD
+(`modifyPageElements`/`insertPageElements`/`deletePageElements`/`batchUpdatePageElements` on
+`PluginCommAPI`). None of these are used by this repo's current code.
+
 ## ⚠️ Authoritative source: the `supernote-docs` MCP
 
 A live documentation MCP (`supernote-docs`) is installed and **MUST be used** for any API/signature
@@ -166,10 +179,20 @@ Key log tags: `ReactNativeJS` (console.log), `PluginHost` (lifecycle), `SNPlugin
 What do you need to do?
 │
 ├─ Manage plugin lifecycle, buttons, events, device info, touch events
-│  → PluginManager (references/api-quick-ref.md §1) — includes registerMotionListener (0.1.43+)
+│  → PluginManager (references/api-quick-ref.md §1) — includes registerMotionListener (0.1.43+),
+│    registerPluginLifeListener (0.1.65+, replaces addPluginLifeListener)
+│
+├─ Check or request access to Document/Note/MyStyle/etc. outside the plugin's own dir
+│  → PluginManager.hasPermission / requestPermission (references/api-quick-ref.md §1
+│    "Permissions") + patterns.md Pattern 17 (0.1.65+)
 │
 ├─ Work with current page context (lasso, stickers, geometry, reload)
 │  → PluginCommAPI (references/api-quick-ref.md §2)
+│
+├─ Modify/insert/delete elements on the currently-open file (no filePath needed)
+│  → PluginCommAPI.modifyPageElements / insertPageElements / deletePageElements /
+│    batchUpdatePageElements (references/api-quick-ref.md §2, 0.1.65+) — call
+│    getPageDisplaySize() first, not PluginFileAPI.getPageSize
 │
 ├─ Operate on file data (pages, elements, layers, templates, keywords)
 │  → PluginFileAPI (references/api-quick-ref.md §3)
@@ -244,6 +267,9 @@ What do you need to do?
 32. **`EinkManager.enableFullUiAuto` is misnamed and does NOT control the digitizer on A5X2 (firmware 2025)**: Despite the suggestive method name, it's e-ink regal/refresh control. Empirically verified: it does not gate pen input. Don't waste a round trip on it for pen disable scenarios — use Pattern 15's `PluginApp.showPluginView` state pair instead.
 33. **PluginHost ignores `MainApplication.getPackages()` — only `PluginConfig.json` `reactPackages` matters**: PluginHost loads NativeModules via the `"reactPackages"` array in `PluginConfig.json`, NOT through the standard RN `MainApplication` → `ReactNativeHost` → `getPackages()` path. The build script auto-discovers third-party packages from `node_modules/`, but your **own** ReactPackage (the one registering custom NativeModules) must be explicitly included. If missing, all custom `NativeModules.*` will be `null` at runtime — code compiles, JS executes, but every native call silently fails. When renaming, consolidating, or refactoring Package classes, always verify the fully-qualified class name appears in `build/generated/PluginConfig.json` after build.
 34. **`logcat` chatty filter hides PluginHost init logs**: Android's chatty mechanism drops repeated lines. PluginHost startup triggers this heavily, hiding diagnostic `Log.i()` output. Disable with `adb logcat -P ""` before capturing, or filter by PID: `adb logcat --pid=$(adb shell pidof com.ratta.supernote.pluginhost)`.
+35. **`PluginManager.addPluginLifeListener` no longer exists (removed in 0.1.65)**: If you (or a stale example) write `PluginManager.addPluginLifeListener({onStart, onStop})`, it will be `undefined` at runtime — TypeScript will also reject it since the type was removed. Use `registerPluginLifeListener({onMsg(msg)})` instead; `msg.state` carries the lifecycle value, there's no more separate start/stop callbacks. See Pattern 9 in `references/patterns.md`.
+36. **`PluginDocAPI.generateDocImage` was renamed to `generateCurrentDocImage` (0.1.65)**: The old signature took an explicit `docPath`; the new one always targets whatever document is currently open in the host and adds a required `type` param (0=default, 1=with text-selection styling). There is no way to render an arbitrary closed document's page anymore via this API.
+37. **`PointUtils.getNotePageSize` was removed (0.1.65), no replacement in `PointUtils`**: Get page size from `PluginFileAPI.getPageSize(filePath, page)` (any file) or `PluginCommAPI.getPageDisplaySize()` (current file only, needed for the new page-element CRUD APIs — using `getPageSize` there can misalign coordinates).
 
 ## When Helping the User
 
