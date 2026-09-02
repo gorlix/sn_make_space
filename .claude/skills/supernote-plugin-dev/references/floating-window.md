@@ -1,11 +1,5 @@
 # Floating Window & Screen Adaptation Patterns
 
-> **make_space:** NOT used in v1. Background context only for the transparency question (the plugin
-> view itself is the overlay; if transparency fails, fall back to `generateNotePng`, not a floating
-> window). See [make-space.md](make-space.md) §4.
-
----
-
 ## Pattern 6: Native System Floating Window (TYPE_APPLICATION_OVERLAY)
 
 **Use case**: Persistent status bubble that survives `closePluginView()` — e.g., background processing indicator.

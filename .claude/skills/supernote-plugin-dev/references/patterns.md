@@ -1,9 +1,5 @@
 # Common Supernote Plugin Patterns
 
-> **make_space:** relevant here = lasso ops + coordinate handling (though this plugin stays in
-> pixels and needs no EMR conversion). Pen-lasso (Pattern 14) and floating-window (Pattern 6) are
-> NOT used in v1. Recipe: [make-space.md](make-space.md).
-
 Reusable code patterns for the most frequent plugin development tasks.
 
 ---
@@ -282,7 +278,7 @@ useEffect(() => {
   const lifeSub = PluginManager.registerPluginLifeListener({
     onMsg: msg => {
       // msg.state is the lifecycle state value; confirm the mapping via the MCP
-      // for the states this project cares about before branching on it.
+      // for the states your plugin cares about before branching on it.
       // Treat "panel closed" as the reset trigger:
       setCurrentScreen(null);
       setSelectedItems([]);
@@ -410,11 +406,16 @@ event as long as it happened within the past second, so a late listener still ca
 
 `FILE:READ`/`FILE:WRITE`/`FILE:DELETE`/`INTERNET` are gated at runtime for anything outside the
 plugin's own private data directory (`Document`, `EXPORT`, `INBOX`, `MyStyle`, `Note`,
-`SCREENSHOT`, external SD/OTG). Declare the permission in `PluginConfig.json`'s `uses-permissions`
-first — calling `hasPermission`/`requestPermission` for an undeclared permission throws (error
-`1500`). This project's own operations (`lassoElements`, `setLassoBoxState`) stay inside the
-currently-open file via `PluginCommAPI` and don't need this; it matters only if a feature starts
-reading/writing arbitrary paths (e.g. sticker export, cross-note operations).
+`SCREENSHOT`, external SD/OTG) — **and `INTERNET` is gated for every outbound socket, full stop,
+with no default-accessible exception** (confirmed on-device: a plugin opening a plain `Socket`
+from native Java/Kotlin code, not just from JS, is blocked identically). Declare the permission in
+`PluginConfig.json`'s `uses-permissions` first — calling `hasPermission`/`requestPermission` for an
+undeclared permission throws (error `1500`), and skipping `requestPermission` entirely still gets
+silently blocked at the socket layer with `SocketException: ... has no NETWORK permission` (visible
+only in `adb logcat`, not surfaced to JS as a catchable error unless your native code forwards it).
+Operations that stay inside the currently-open file via `PluginCommAPI` (`lassoElements`,
+`setLassoBoxState`, etc.) don't need any of this; it matters only once a feature reads/writes
+arbitrary paths or opens a network socket.
 
 ```ts
 import { PluginManager } from 'sn-plugin-lib';
@@ -431,9 +432,27 @@ async function ensureWriteAccess(): Promise<boolean> {
 }
 ```
 
+Same pattern for `INTERNET` — check/request it once before opening the plugin's first socket (e.g.
+right before starting a listener or making an outbound connection), not at mount time, so the
+dialog appears in context:
+
+```ts
+const granted = await PluginManager.hasPermission('plugin.permission.INTERNET');
+if (granted !== 1) {
+  const result = await PluginManager.requestPermission(
+    'plugin.permission.INTERNET',
+    'Explain in one line why the plugin needs network access.',
+  );
+  if (result === 0) throw new Error('PERMISSION_DENIED'); // or your own sentinel
+}
+```
+
 **Gotchas**:
 - `"Allow this time only"` (`1`) is revoked when the plugin exits — re-check with `hasPermission`
   on next launch, don't cache the result across sessions.
 - `-1` (dialog dismissed without a choice) is treated as deny, but the dialog reappears on the next
   `requestPermission` call — don't loop-retry immediately, surface a UI affordance instead.
 - `desc` only customizes the "already denied" dialog copy; it's ignored for every other state.
+- Forgetting to add the permission to `PluginConfig.json`'s `uses-permissions` array is the single
+  most common cause of "start error / this permission has not been declared" — check the manifest
+  before debugging the JS/native call chain.

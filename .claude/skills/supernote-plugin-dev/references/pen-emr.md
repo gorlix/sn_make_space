@@ -1,10 +1,5 @@
 # Pen Lasso & EMR Pen Disable Patterns
 
-> **make_space:** NOT used in v1. The user taps with a finger and draws nothing inside the plugin,
-> so there is no EMR leak to guard. Relevant only if v2-advanced adds in-plugin pen gestures.
-
----
-
 ## Pattern 14: Pen Lasso — Convert a Drawn Stroke into a Rectangular Lasso
 
 **Use case**: User presses a "lasso mode" button, draws a freehand stroke to define a region, and the plugin converts that stroke into a native rectangular lasso selection.

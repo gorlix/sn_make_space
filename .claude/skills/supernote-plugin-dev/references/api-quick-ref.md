@@ -2,9 +2,9 @@
 
 All imports from `sn-plugin-lib`. All async methods return `APIResponse<T>` unless noted.
 
-Signatures verified against `sn-plugin-lib@0.1.65` (this project pins `^0.1.65`, up from
-`^0.1.19`). Anything tagged "Added in 0.1.43" or "0.1.65" documents an SDK version floor; always
-re-check the `supernote-docs` MCP for the current signature before writing code.
+Signatures verified against `sn-plugin-lib@0.1.65`. Anything tagged "Added in 0.1.43" or "0.1.65"
+documents an SDK version floor; always re-check the `supernote-docs` MCP for the current signature
+before writing code, and check your own `package.json` for the pinned `sn-plugin-lib` version.
 
 ---
 

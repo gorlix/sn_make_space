@@ -1,9 +1,5 @@
 # Supernote Plugin SDK Type Definitions
 
-> **make_space:** relevant types are `Rect` (pixel — for `lassoElements`), `Size` (for
-> `getPageSize`), and `APIResponse`. `Element`/`Stroke` field-level position shifting matters only
-> for the deferred v2-advanced auto-move. See [make-space.md](make-space.md).
-
 All types from `sn-plugin-lib`.
 
 ---

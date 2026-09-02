@@ -1,10 +1,5 @@
 # Setup, Build & Debug Guide
 
-> **make_space:** scaffold already exists — skip project init. Use this for `buildPlugin.sh`,
-> adb deploy, logcat debug, and as context for the release CI. See [make-space.md](make-space.md) §9.
-
----
-
 ## §1 Environment Requirements
 
 | Dependency | Minimum Version | Notes |
