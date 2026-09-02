@@ -1,9 +1,5 @@
 # SQLite Local Storage Pattern
 
-> **make_space:** NOT used — the plugin stores no local data in v1.
-
----
-
 ## Pattern 11: SQLite Local Storage in a Plugin
 
 Plugins can use SQLite for persistent data storage via `react-native-sqlite-storage`. The database path must be prefixed with `plugins/<pluginID>/` to stay within the plugin's sandboxed directory.

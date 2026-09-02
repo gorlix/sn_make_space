@@ -1,73 +1,57 @@
 ---
 name: supernote-plugin-dev
-description: "Build, debug, and extend Supernote e-ink device plugins using the sn-plugin-lib SDK (React Native + Android). This repo IS the `make_space` plugin (OneNote-style 'insert writing space' via tap-Y → native lasso). Trigger this skill whenever the user mentions Supernote, sn-plugin-lib, PluginManager, PluginCommAPI, PluginFileAPI, PluginNoteAPI, PluginDocAPI, .snplg files, e-ink plugin development, the make_space plugin, lasso/insert-space, or wants to create/modify a plugin for Supernote NOTE or DOC apps. Also trigger when the user discusses EMR coordinates, lasso operations on e-ink devices, or any React Native plugin targeting the Supernote PluginHost runtime. Even if the user just says 'plugin for my notebook' or 'extend my note-taking app' in the context of Supernote hardware, use this skill."
+description: "Build, debug, and extend Supernote e-ink device plugins using the sn-plugin-lib SDK (React Native + Android). Generic skill for ANY Supernote plugin project — not tied to a specific plugin. Trigger this skill whenever the user mentions Supernote, sn-plugin-lib, PluginManager, PluginCommAPI, PluginFileAPI, PluginNoteAPI, PluginDocAPI, .snplg files, e-ink plugin development, PluginHost, lasso operations, EMR coordinates, or wants to create/modify/debug a plugin for the Supernote NOTE or DOC apps. Even if the user just says 'plugin for my notebook' or 'extend my note-taking app' in the context of Supernote hardware, use this skill. If the current repo also has a project-specific Supernote skill (e.g. named after the plugin itself), read that one FIRST for this-repo facts, then use this skill for the generic SDK/workflow knowledge it doesn't repeat."
 ---
 
 # Supernote Plugin Development Skill
 
 You are an expert Supernote plugin developer. Supernote plugins extend the NOTE (handwriting notebook) and DOC (document reader) apps on Supernote e-ink devices. Plugins run inside a **PluginHost** process that provides a React Native runtime, and communicate with NOTE/DOC via AIDL + SDK interfaces.
 
+This skill is deliberately **project-agnostic** — it applies to any Supernote plugin. If the repo you're working in has its own project-specific skill (check `.claude/*/SKILL.md` for one named after the plugin), read that first for this-repo facts (pluginID, architecture, known pitfalls specific to that codebase); come back here for generic SDK/workflow/gotcha knowledge.
+
 ## 📦 SDK version
 
-This project pins `sn-plugin-lib` `^0.1.65` (bumped 2026-09-01 from `^0.1.19`; installed
-`node_modules` had drifted to `0.1.43`). `0.1.65` is a superset for everything this project uses —
-`typecheck`/`lint`/`test:ci` all pass unchanged, no source changes were required for the bump
-itself. Notable SDK changes between `0.1.19` and `0.1.65` that affect the reference docs below:
+Check the plugin's own `package.json` for the pinned `sn-plugin-lib` version before relying on any
+version-gated fact below — don't assume `0.1.65` is what a given repo uses. Notable SDK changes
+between `0.1.19` and `0.1.65` that affect the reference docs below (verify against your repo's
+actual pinned version and the MCP before trusting these):
 `PluginManager.addPluginLifeListener` → `registerPluginLifeListener` (breaking, different callback
 shape), `PluginDocAPI.generateDocImage` → `generateCurrentDocImage` (renamed + new `type` param),
 `PointUtils.getNotePageSize` removed (no replacement), new `hasPermission`/`requestPermission`
-runtime permission gate, and new current-file page-element CRUD
-(`modifyPageElements`/`insertPageElements`/`deletePageElements`/`batchUpdatePageElements` on
-`PluginCommAPI`). None of these are used by this repo's current code.
+runtime permission gate (see Pattern 17 in `references/patterns.md`), and new current-file
+page-element CRUD (`modifyPageElements`/`insertPageElements`/`deletePageElements`/
+`batchUpdatePageElements` on `PluginCommAPI`).
+
+**react-native is pinned to `0.79.2` for every plugin, hard, by the host device itself** — not just
+a per-project convention. Supernote's own docs state: *"The plugin framework uses React Native
+0.79.2. Your plugin project must use the same version; otherwise it may fail to run or be
+incompatible with the host."* Do not let a plugin's `react-native` drift from `0.79.2`, and treat
+any request to bump it as blocked-by-design until Supernote itself updates the on-device host
+runtime — re-check the `supernote-docs` MCP periodically rather than assuming this is stale.
+
+**A React `react-native-renderer` version mismatch crashes silently on-device, not in `npm test`.**
+`react-native@0.79.2` bundles its own `react-native-renderer` built against `react@19.0.0` exactly.
+npm's peer range on `react-native` (`^19.0.0`) is loose enough to let `npm install` pull a newer
+`react` (e.g. `19.2.x`) without any warning, but at runtime React throws `Incompatible React
+versions` followed by `TypeError: Cannot read property 'default' of undefined` before the first
+render — the UI never appears and there's no error visible to the user. If `react-native` stays
+pinned at `0.79.2`, keep `react`/`react-test-renderer`/`@types/react` pinned at exactly `19.0.0`
+too, regardless of what `npm outdated` suggests. Verify any `react` bump by watching `adb logcat`
+on a real device (or emulator) before trusting `npm test` alone.
 
 ## ⚠️ Authoritative source: the `supernote-docs` MCP
 
-A live documentation MCP (`supernote-docs`) is installed and **MUST be used** for any API/signature
-question. It has two tools: `search_supernote` (semantic) and `query_docs_filesystem_supernote`
-(`rg`/`cat`/`tree` over the `.mdx` docs). The live docs are the **authoritative, up-to-date**
-source. The local `references/*.md` files are a useful supplement but **may lag** — when they
-disagree with the MCP, trust the MCP. Query the MCP before writing any SDK code.
-
-## 🎯 This Project: `make_space` (v2) — READ FIRST
-
-This repository is **one specific plugin**, not a generic playground. Goal: insert blank writing
-space mid-page (inspired by OneNote *"Insert extra writing space"*).
-
-**Confirmed v2 flow** (the move is done by the native lasso, NOT by the plugin):
-1. Sidebar/toolbar button (**NOTE only**, `id 100`, `showType:1`) opens the plugin UI.
-2. UI = fullscreen **transparent overlay with a thick grey border** (the visual cue "do something").
-3. User taps a Y point → plugin builds a pixel rect `{left:0, top:cutY, right:pageW, bottom:pageH}`
-   → `PluginCommAPI.lassoElements(rect)` selects everything below the line →
-   `setLassoBoxState(0)` shows the box → `PluginManager.closePluginView()`.
-4. User **drags the native lasso selection by hand** to open space. Native move + native undo.
-
-**Why no auto-move:** the SDK has **no "move selection" API** (`resizeLassoRect` = proportional
-scale only). A true one-gesture auto-move would require rewriting every stroke's EMR sample points
-via `ElementDataAccessor.setRange` + coord conversion — deferred to "v2 advanced".
-
-**API subset actually used** (look these up in the MCP, not from memory):
-`PluginManager.init / registerButton / closePluginView`, `PluginCommAPI.getPageDisplaySize /
-lassoElements / setLassoBoxState` (+ `generateNotePng` for the transparency fallback).
-**Not** `PluginFileAPI.getPageSize` — that got `FILE:READ`-gated under firmware Chauvet
-`3.29.43_beta` and silently broke the cut flow; see `references/make-space.md` §12 and gotcha #38.
-
-**Locked decisions:** target **NOTE only**; overflow past page bottom **ignored in v1**; layer
-toggle (all↔current) **pending SDK verification**; i18n = **en + it** only (extendable);
-transparent overlay is primary, `generateNotePng` background image is the fallback if transparency
-isn't honored on-device.
-
-**Most relevant gotchas for THIS task:** #3 (pixel vs EMR — here everything is **pixel**, no
-conversion), #6 (lasso needs an active selection — we create it), plus the `lassoElements`
-"strokes must be **fully inside** the rect" rule (a stroke crossing the cut line is missed — see
-`references/make-space.md`).
-
-**Process rules (from the user):** serious JSDoc comments (explain *why*, not *what*); pure logic
-in `src/makeSpace.ts` (`computeLassoRect`) so it's unit-testable without a device; quality gates
-(typecheck/eslint/prettier/jest); **each unit on its own branch + PR**; CI on push/PR; release on
-tag `v*`. Full step-by-step plan lives at
-`/home/gorlix/.claude/plans/valuterei-che-quando-si-compiled-eagle.md`.
-
-→ **For the implementation recipe, read `references/make-space.md` first.**
+A live documentation MCP (`supernote-docs`) should be configured for any serious Supernote plugin
+work and **MUST be used** for any API/signature question — if it isn't configured in the current
+project yet, add it: `claude mcp add --transport http --scope project supernote-docs
+https://docs.supernote.com/mcp` (then approve it in an interactive session; it can't self-approve
+in a non-interactive one). It has three tools: `search_supernote` (semantic search),
+`query_docs_filesystem_supernote` (`rg`/`cat`/`tree` over the `.mdx` docs), and `submit_feedback`
+(report a doc bug back to Supernote). The live docs are the **authoritative, up-to-date** source.
+The local `references/*.md` files in this skill are a useful supplement but **may lag** — when they
+disagree with the MCP, trust the MCP. Query the MCP before writing any SDK code, and especially
+before assuming any version-pin, permission, or compatibility fact carried over from a previous
+project or an older revision of these reference files.
 
 ## Before You Start
 
@@ -76,19 +60,17 @@ against the `supernote-docs` MCP, which is authoritative):
 
 | Task | Read first |
 |------|-----------|
-| **`make_space` implementation (THIS project)** | **`references/make-space.md`** ⭐ |
 | Any API call or type question | MCP `supernote-docs` → then `references/api-quick-ref.md` |
 | New project / environment / build / deploy / debug | `references/setup-and-build.md` |
-| Common recipes (lasso ops, coordinate conversion, pending button, etc.) | `references/patterns.md` |
+| Common recipes (lasso ops, coordinate conversion, pending button, permissions, etc.) | `references/patterns.md` |
 | Type definitions (Element, Stroke, Geometry, TextBox, etc.) | `references/types.md` |
-| i18n, multi-language buttons (used here: en + it) | `references/i18n.md` |
-| Floating window overlay (transparency fallback context) | `references/floating-window.md` |
-| Pen lasso, EMR pen disable, scoped pen lock (v2-advanced only) | `references/pen-emr.md` |
-| SQLite local storage in plugins (not used in v1) | `references/sqlite.md` |
+| i18n, multi-language buttons | `references/i18n.md` |
+| Floating window overlay | `references/floating-window.md` |
+| Pen lasso, EMR pen disable, scoped pen lock | `references/pen-emr.md` |
+| SQLite local storage in plugins | `references/sqlite.md` |
 
-For `make_space` work, `references/make-space.md` is the entry point. The reference files contain
-**authoritative API signatures and constraints** — do not rely on memory alone; the live MCP wins
-on any conflict.
+The reference files contain **authoritative API signatures and constraints** gathered from real
+plugin builds — do not rely on memory alone; the live MCP wins on any conflict.
 
 ## Architecture (30-second overview)
 
@@ -161,6 +143,18 @@ Always check `success` before reading `result`.
 ### PluginConfig.json
 - `pluginKey` MUST match the first argument of `AppRegistry.registerComponent(...)`. Mismatch = plugin won't load.
 - `pluginID` is auto-generated on first build. Never change it after distribution — it identifies the plugin.
+- `name` is what shows in Settings → Apps → Plugins. It is **not** auto-derived from the in-app
+  title string — a plugin can easily ship with a friendly in-app title while the install list still
+  shows the raw npm-style package slug (e.g. `sn-my-plugin`) because `name` was never edited from
+  its scaffold default. Keep it in sync with whatever the plugin actually calls itself.
+- `iconPath` (relative path to project root, e.g. `assets/icon.png`) is **not set by the scaffold
+  script** — it must be added manually, same as `author`. Without it, the plugin ships with no
+  custom icon in the install list (silently — no build warning). `buildPlugin.sh` copies the file
+  and rewrites `iconPath` to `/<filename>` in the packaged config; check the generated
+  `build/outputs/*.snplg`'s `PluginConfig.json` to confirm it actually landed.
+- `uses-permissions` (string array, e.g. `["plugin.permission.INTERNET"]`) must list every
+  permission the plugin will ever call `hasPermission`/`requestPermission` for — see Pattern 17 in
+  `references/patterns.md`. Not set by the scaffold either; add manually.
 
 ## Build, Deploy & Debug
 
@@ -226,10 +220,8 @@ What do you need to do?
 │     4. cancelRecognize() to abort a long-running recognition if needed
 │
 └─ Extract hardcoded strings / add multi-language support (i18n)
-   → THIS project ships en + it only. See references/make-space.md §5 and i18n.md
-     Pattern 7 (JSON button name) + Pattern 10 (registerLangListener).
-     Locale files: src/i18n/locales/{en_US,it_IT}.json
-   → Generic extract-translate-convert workflow (other locales): patterns.md Pattern 12
+   → references/i18n.md Pattern 7 (JSON button name) + Pattern 10 (registerLangListener)
+   → Generic extract-translate-convert workflow for new locales: patterns.md Pattern 12
 ```
 
 ## Common Gotchas
@@ -271,9 +263,10 @@ What do you need to do?
 35. **`PluginManager.addPluginLifeListener` no longer exists (removed in 0.1.65)**: If you (or a stale example) write `PluginManager.addPluginLifeListener({onStart, onStop})`, it will be `undefined` at runtime — TypeScript will also reject it since the type was removed. Use `registerPluginLifeListener({onMsg(msg)})` instead; `msg.state` carries the lifecycle value, there's no more separate start/stop callbacks. See Pattern 9 in `references/patterns.md`.
 36. **`PluginDocAPI.generateDocImage` was renamed to `generateCurrentDocImage` (0.1.65)**: The old signature took an explicit `docPath`; the new one always targets whatever document is currently open in the host and adds a required `type` param (0=default, 1=with text-selection styling). There is no way to render an arbitrary closed document's page anymore via this API.
 37. **`PointUtils.getNotePageSize` was removed (0.1.65), no replacement in `PointUtils`**: Get page size from `PluginFileAPI.getPageSize(filePath, page)` (any file) or `PluginCommAPI.getPageDisplaySize()` (current file only, needed for the new page-element CRUD APIs — using `getPageSize` there can misalign coordinates).
-38. **`PluginFileAPI.getPageSize(filePath, page)` got silently `FILE:READ`-gated under firmware Chauvet `3.29.43_beta` (confirmed on-device, sn-plugin-lib 0.1.65)**: no `PluginConfig.json` change is documented as required, and the call used to just work — but on this firmware `checkAPIAvailable` now logs `PluginSec: DENY reason=sdcard_no_read path=...` for any plugin that hasn't declared `FILE:READ`, and the API resolves as if the page size were unavailable (no thrown error, just an unusable result — easy to misdiagnose as a lasso/geometry bug instead of a permission one). **make_space was broken by exactly this**: `getPageSize` failing meant `loadContext()` returned null and `lassoElements` was never even called, so the symptom looked like "the lasso selects nothing" with no hint that a permission check was involved. Fix used here: switch to `PluginCommAPI.getPageDisplaySize()` (current-page context, like `lassoElements`/`setLassoBoxState`) instead of declaring the permission — it isn't gated and needs no `filePath`. Only fall back to declaring `plugin.permission.FILE:READ` (Pattern 17) if you genuinely need an arbitrary file's page size, not the currently open one. When any previously-working `PluginFileAPI` call starts silently no-opping after a firmware/SDK update, grep `adb logcat` for `PluginSec.*DENY` before assuming the plugin's own logic broke.
+38. **`PluginFileAPI.getPageSize(filePath, page)` got silently `FILE:READ`-gated under firmware Chauvet `3.29.43_beta` (confirmed on-device, sn-plugin-lib 0.1.65)**: no `PluginConfig.json` change is documented as required, and the call used to just work — but on this firmware `checkAPIAvailable` now logs `PluginSec: DENY reason=sdcard_no_read path=...` for any plugin that hasn't declared `FILE:READ`, and the API resolves as if the page size were unavailable (no thrown error, just an unusable result — easy to misdiagnose as a lasso/geometry bug instead of a permission one). One plugin was broken by exactly this: `getPageSize` failing meant a lasso-setup helper returned null and the lasso API was never even called, so the symptom looked like "the lasso selects nothing" with no hint that a permission check was involved. Prefer `PluginCommAPI.getPageDisplaySize()` (current-page context, like `lassoElements`/`setLassoBoxState`) over `getPageSize` when you only need the currently-open file's page size — it isn't gated and needs no `filePath`. Only fall back to declaring `plugin.permission.FILE:READ` (Pattern 17) if you genuinely need an arbitrary file's page size. When any previously-working `PluginFileAPI` call starts silently no-opping after a firmware/SDK update, grep `adb logcat` for `PluginSec.*DENY` before assuming the plugin's own logic broke. The same class of bug bit `INTERNET` too (see the SDK version note above and Pattern 17) — any permission-gated API can regress this way after a firmware update, not just file access.
 39. **Reinstalling from Settings → Apps → Plugins does NOT read the file you just `adb push`ed to `MyStyle/`**: the host keeps its own managed copy at `MyStyle/Plugins/<name>.snplg` and the in-UI "reinstall/update" action installs from *that* copy, not from whatever you dropped in `MyStyle/` root. Confirmed on-device: pushing a rebuilt `.snplg` to `MyStyle/` and tapping reinstall silently reran the **old** build (same `versionName`/`versionCode` as before) — looked exactly like "the fix didn't do anything." Push directly to `MyStyle/Plugins/<name>.snplg` (overwrite in place) when iterating on a fix, or use "Add Plugin" to browse to the new file explicitly rather than reinstalling the existing entry.
-40. **Every `console.log` gated behind `__DEV__` is silent in a real install — `buildPlugin.sh` always bundles with `--dev false`**, including ad-hoc local test builds, not just CI releases. There is no separate "debug build" path in this project's build script. Consequence: extensive `__DEV__`-gated logging (this project has plenty, by design — see the `log()` helper in `index.js`/`App.tsx`) is completely invisible via `adb logcat` on any sideloaded build, which can make a real bug look like "nothing happened" when actually the JS ran fine but you can't see it. Keep one deliberately **ungated** `console.log` at startup (e.g. `${TAG} v${versionName} (code ${versionCode}) starting`, reading from `PluginConfig.json`) so `adb logcat -s ReactNativeJS:V` at least confirms which build is actually running before debugging further — this also catches gotcha #39 (stale reinstall) immediately instead of after a confusing detour.
+40. **Every `console.log` gated behind `__DEV__` is silent in a real install — `buildPlugin.sh` always bundles with `--dev false`**, including ad-hoc local test builds, not just CI releases. There is typically no separate "debug build" path in a plugin's build script. Consequence: extensive `__DEV__`-gated logging is completely invisible via `adb logcat` on any sideloaded build, which can make a real bug look like "nothing happened" when actually the JS ran fine but you can't see it. Keep one deliberately **ungated** `console.log`/native-log line at startup (e.g. `${TAG} v${versionName} (code ${versionCode}) starting`, reading from `PluginConfig.json`) so `adb logcat` at least confirms which build is actually running before debugging further — this also catches gotcha #39 (stale reinstall) immediately instead of after a confusing detour. Prefer a custom logcat tag over the generic `ReactNativeJS` tag if the plugin has native code too (route both JS and native logs through one tag) — it makes `adb logcat -v time -s <TAG>` show the full picture in one stream instead of juggling multiple filters.
+41. **Testing a plugin's own TCP/network sockets doesn't need the device on the same network as your dev machine**: `adb forward tcp:<local> tcp:<device-port>` tunnels a local TCP port straight to a port the plugin opened on the device over the existing USB/ADB connection, regardless of WiFi. Use it to `curl`/`nc`/raw-socket-probe a plugin's listener directly (`adb forward tcp:18888 tcp:8888` then `curl http://127.0.0.1:18888/`) instead of asking the user to find and share the device's WiFi IP. Combine with `adb logcat -v time -s <TAG>` (see gotcha #40) to correlate what you see over the forwarded connection with what the plugin's own logs say happened — this is how a "the tunnel opens but relays fail" bug (native socket blocked by an undeclared permission, not a code bug) gets diagnosed instead of guessed at.
 
 ## When Helping the User
 
@@ -281,5 +274,6 @@ What do you need to do?
 - **For API questions**: Look up the exact signature in `references/api-quick-ref.md`. Provide working code with proper error handling.
 - **For debugging**: Check the gotchas list first. Common issues: missing init, wrong coordinates, missing lasso context, wrong layer.
 - **For complex features**: Combine patterns from `references/patterns.md`. Show the full flow including error handling and resource cleanup.
-- **For i18n / localization requests** ("extract strings", "multi-language", "i18n"): THIS project ships **en + it** only (`src/i18n/locales/{en_US,it_IT}.json`) — see `references/make-space.md` §5 and `references/i18n.md` Pattern 7 (JSON button name) + Pattern 10 (`registerLangListener`). For adding *new* locales from scratch, the generic extract-translate-convert workflow is Pattern 12 in `references/patterns.md`.
-- **Always**: Include TypeScript types, proper `APIResponse` checking, and `recycle()` calls where applicable.
+- **For i18n / localization requests** ("extract strings", "multi-language", "i18n"): see `references/i18n.md` Pattern 7 (JSON button name) + Pattern 10 (`registerLangListener`). For adding new locales from scratch, the generic extract-translate-convert workflow is Pattern 12 in `references/patterns.md`. Check the repo's own locale files/config for which languages it already ships before assuming.
+- **For network/socket features** (a plugin that opens its own TCP/HTTP listener or makes outbound requests): remember `INTERNET` is a runtime-gated permission like the file ones — declare it in `uses-permissions` and call `requestPermission` before the first socket, or every connection will fail with an on-device-only `SocketException` that's invisible unless you're watching `adb logcat` (see the SDK version note above, Pattern 17, and gotcha #41 for how to verify it actually works end-to-end).
+- **Always**: Include TypeScript types, proper `APIResponse` checking, and `recycle()` calls where applicable. Verify any non-trivial change on a real device via `adb logcat` before calling it done — `npm test`/`tsc` passing does not mean the plugin works on-device (see the react-native-renderer version-mismatch note above for a concrete example of a change that passed all local checks and still crashed at runtime).
