@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "supernote-plugin-dev": {
+      "source": {
+        "source": "github",
+        "repo": "gorlix/supernote-plugin-dev"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "supernote-plugin-dev@supernote-plugin-dev": true
+  }
+}
