@@ -9,7 +9,7 @@
  * can drag the selection to make space.
  *
  * The move and its undo are native NOTE behavior — this plugin only builds the
- * selection. See .claude/skills/make-space/references/make-space.md.
+ * selection. See .claude/make-space-plugin/references/make-space.md.
  *
  * @format
  */

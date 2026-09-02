@@ -1,6 +1,6 @@
 ---
-name: make-space
-description: "Project-specific knowledge for the `make_space` Supernote plugin — THIS repo (sn_make_space). OneNote-style 'insert extra writing space' via tap → native lasso, in both Above and Below directions. Trigger whenever working in this repo, or when the user mentions make_space, Make Space, Fai Spazio, 'insert writing space', or this plugin by name/pluginID (lome8csqs3xu38pv). This skill covers only facts specific to this codebase — locked decisions, current architecture, known incidents, release workflow. For generic Supernote SDK/API/pattern knowledge (API signatures, coordinate systems, permission gotchas, build/deploy mechanics), use the companion `supernote-plugin-dev` skill; the two are designed to be used together without duplicating each other."
+name: make-space-plugin
+description: "This-repo facts for the sn_make_space ('Make Space') Supernote plugin — OneNote-style 'insert extra writing space' via tap → native lasso, in both Above and Below directions. Trigger this skill for ANY work inside this repo: bugs, features, dependency bumps, release prep, or questions about how the direction/lasso/permission/build flow actually works here. This is the project-specific companion to the generic `supernote-plugin-dev` skill (installed as a Claude Code plugin) — load that one too for SDK-wide facts (coordinate systems, lasso APIs, permission gotchas, build mechanics) this skill doesn't repeat. Also trigger on: make_space, Make Space, Fai Spazio, 'insert writing space', computeLassoRect, PluginConfig.json in this repo, or this plugin by pluginID (lome8csqs3xu38pv)."
 ---
 
 # make_space — Project Skill

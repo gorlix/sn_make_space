@@ -85,3 +85,6 @@ build/generated/
 
 # Logs
 *.log
+
+# Claude Code local-only settings (machine-specific permission allowlist)
+.claude/settings.local.json
